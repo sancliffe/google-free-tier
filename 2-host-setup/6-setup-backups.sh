@@ -4,58 +4,51 @@
 #
 # This script configures a daily cron job that compresses a specified
 # directory and uploads it to a GCS bucket.
+#
+# Usage: 6-setup-backups.sh <GCS_BUCKET_NAME> <BACKUP_DIRECTORY>
 
 source "$(dirname "$0")/common.sh"
 
 # --- Constants ---
 BACKUP_SCRIPT_PATH="/usr/local/bin/backup-to-gcs.sh"
 
-# --- Function to prompt for user input ---
-prompt_for_details() {
-    # Prompt for GCS Bucket
-    while [[ -z "${BUCKET_NAME:-}" ]]; do
-        read -p "Enter the GCS bucket name for backups (e.g., 'my-vm-backups'): " BUCKET_NAME
-        if [[ -z "${BUCKET_NAME}" ]]; then
-            log_error "Bucket name cannot be empty."
-        fi
-    done
-
-    # Prompt for Directory
-    while [[ -z "${BACKUP_DIR:-}" ]]; do
-        read -p "Enter the absolute path of the directory to back up (e.g., '/var/www/html'): " BACKUP_DIR
-        if [[ ! -d "${BACKUP_DIR}" ]]; then
-            log_error "Directory '${BACKUP_DIR}' does not exist."
-            BACKUP_DIR=""
-        fi
-    done
-}
-
 # --- Main Logic ---
 main() {
     log_info "--- Phase 6: Setting up Automated Backups ---"
     ensure_root
 
+    # --- Validate Arguments ---
+    if [[ "$#" -ne 2 ]]; then
+        log_error "Usage: $0 <GCS_BUCKET_NAME> <BACKUP_DIRECTORY>"
+        exit 1
+    fi
+
+    local BUCKET_NAME="$1"
+    local BACKUP_DIR="$2"
+
+    if [[ -z "${BUCKET_NAME}" ]]; then
+        log_error "Bucket name cannot be empty."
+        exit 1
+    fi
+
+    if [[ ! -d "${BACKUP_DIR}" ]]; then
+        log_error "Directory '${BACKUP_DIR}' does not exist. Please create it first."
+        exit 1
+    fi
+
     # --- Dependencies ---
     if ! command -v gsutil &> /dev/null; then
         log_warn "gsutil command not found. It is part of the Google Cloud SDK."
-        read -p "Would you like to install the Google Cloud SDK on this VM now? (y/N): " choice
-        if [[ "${choice}" =~ ^[Yy]$ ]]; then
-            log_info "Installing Google Cloud SDK..."
-            # Follow official instructions
-            apt-get update -qq
-            apt-get install -y -qq apt-transport-https ca-certificates gnupg
-            echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-            curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
-            apt-get update -qq
-            apt-get install -y -qq google-cloud-sdk
-            log_success "Google Cloud SDK installed."
-        else
-            log_error "gsutil is required for backups. Exiting."
-            exit 1
-        fi
+        log_info "Attempting to install Google Cloud SDK..."
+        # Follow official instructions
+        apt-get update -qq
+        apt-get install -y -qq apt-transport-https ca-certificates gnupg
+        echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+        curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+        apt-get update -qq
+        apt-get install -y -qq google-cloud-sdk
+        log_success "Google Cloud SDK installed."
     fi
-
-    prompt_for_details
 
     log_info "Creating backup script at ${BACKUP_SCRIPT_PATH}..."
     # This HEREDOC creates the actual script that the cron job will run.
@@ -119,7 +112,6 @@ EOF
     log_success "Setup complete!"
     log_info "Your directory '${BACKUP_DIR}' will be backed up daily to the 'gs://${BUCKET_NAME}' bucket."
     log_info "The cron job will run at 3:00 AM server time. A log will be kept at ${cron_log}."
-    log_warn "IMPORTANT: Ensure your GCS bucket '${BUCKET_NAME}' exists and that this VM has write permissions to it."
     log_info "---------------------------------------------"
 }
 

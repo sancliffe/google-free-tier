@@ -126,6 +126,17 @@ resource "google_compute_firewall" "default" {
   target_tags = ["http-server", "https-server"]
 }
 
+resource "google_storage_bucket" "backup_bucket" {
+  name          = var.gcs_bucket_name
+  location      = var.region
+  force_destroy = false
+  uniform_bucket_level_access = true
+
+  versioning {
+    enabled = true
+  }
+}
+
 # Creates a notification channel to send alerts to your email.
 resource "google_monitoring_notification_channel" "email" {
   display_name = "Admin On-Call"
