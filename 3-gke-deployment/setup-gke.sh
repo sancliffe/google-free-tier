@@ -37,7 +37,8 @@ main() {
 
     local repo_name="gke-apps"
     local image_name="hello-gke"
-    local image_tag="v1.0.0"
+    local image_tag="${3:-latest}"
+    log_info "Using image tag: ${image_tag}"
 
     # --- 2. Build and Push Docker Image ---
     log_info "Configuring Docker to authenticate with Artifact Registry..."

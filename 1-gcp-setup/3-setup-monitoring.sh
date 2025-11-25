@@ -12,7 +12,7 @@
 set -euo pipefail
 
 _log_prefix() {
-    echo "$(_log_prefix "INFO") $1"
+    echo "$(date +'%Y-%m-%d %H:%M:%S') $1"
 }
 log_info() { echo -e "$(_log_prefix "INFO") $1"; }
 log_success() { echo -e "$(_log_prefix "✅") \033[0;32m$1\033[0m"; }
