@@ -5,7 +5,7 @@
 # This script installs Fail2Ban and configures it to protect against
 # brute-force attacks on SSH and Nginx.
 
-source "$(dirname "$0")/common.sh"
+source "/tmp/2-host-setup/common.sh"
 
 # --- Main Logic ---
 main() {

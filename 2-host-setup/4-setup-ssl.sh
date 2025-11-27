@@ -6,7 +6,7 @@
 # domain. It requires Nginx to be installed and the domain's DNS A record
 # to be pointing to this server's IP address.
 
-source "$(dirname "$0")/common.sh"
+source "/tmp/2-host-setup/common.sh"
 
 # --- Function to prompt for user input ---
 prompt_for_details() {

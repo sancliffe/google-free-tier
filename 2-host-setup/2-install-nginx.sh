@@ -11,7 +11,7 @@
 # We use it to import our helper functions and settings from common.sh.
 # The `dirname "$0"` part ensures we find common.sh relative to this script's
 # location, regardless of where the script is called from.
-source "$(dirname "$0")/common.sh"
+source "/tmp/2-host-setup/common.sh"
 
 # --- Main Logic ---
 main() {

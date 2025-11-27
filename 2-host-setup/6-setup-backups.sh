@@ -2,7 +2,7 @@
 #
 # Phase 6: Set up automated daily backups to Google Cloud Storage.
 
-source "$(dirname "$0")/common.sh"
+source "/tmp/2-host-setup/common.sh"
 
 # --- Constants ---
 BACKUP_SCRIPT_PATH="/usr/local/bin/backup-to-gcs.sh"

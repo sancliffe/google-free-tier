@@ -6,7 +6,7 @@
 # out-of-memory errors by using disk space as virtual RAM. This script is
 # idempotent and will not create a new swapfile if one already exists.
 
-source "$(dirname "$0")/common.sh"
+source "/tmp/2-host-setup/common.sh"
 
 # --- Constants ---
 #

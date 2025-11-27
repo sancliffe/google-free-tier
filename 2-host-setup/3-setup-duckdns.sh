@@ -2,7 +2,7 @@
 #
 # Phase 3: Set up DuckDNS for dynamic IP updates.
 
-source "$(dirname "$0")/common.sh"
+source "/tmp/2-host-setup/common.sh"
 
 # --- Constants ---
 INSTALL_DIR="${HOME}/.duckdns"

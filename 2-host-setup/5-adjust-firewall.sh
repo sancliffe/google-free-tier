@@ -5,7 +5,7 @@
 # This script opens ports for Nginx (HTTP & HTTPS) if the UFW firewall
 # is active on the VM.
 
-source "$(dirname "$0")/common.sh"
+source "/tmp/2-host-setup/common.sh"
 
 main() {
     log_info "--- Phase 5: Adjusting Local Firewall (UFW) ---"
