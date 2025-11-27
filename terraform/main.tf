@@ -78,6 +78,36 @@ variable "domain_name" {
   type        = string
 }
 
+# --- Service Account & IAM ---
+
+resource "google_service_account" "vm_sa" {
+  account_id   = "free-tier-vm-sa"
+  display_name = "Free Tier VM Service Account"
+}
+
+# Allow writing logs (required for Cloud Logging agent)
+resource "google_project_iam_member" "log_writer" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${google_service_account.vm_sa.email}"
+}
+
+# Allow writing metrics (required for Cloud Monitoring agent)
+resource "google_project_iam_member" "metric_writer" {
+  project = var.project_id
+  role    = "roles/monitoring.metricWriter"
+  member  = "serviceAccount:${google_service_account.vm_sa.email}"
+}
+
+# Allow full control of objects for backups (Write new, Delete old)
+resource "google_project_iam_member" "storage_admin" {
+  project = var.project_id
+  role    = "roles/storage.objectAdmin"
+  member  = "serviceAccount:${google_service_account.vm_sa.email}"
+}
+
+# --- Compute Engine ---
+
 # Creates a Google Compute Engine instance.
 resource "google_compute_instance" "default" {
   name         = "free-tier-vm"
@@ -99,6 +129,13 @@ resource "google_compute_instance" "default" {
   tags = ["http-server", "https-server"]
 
   metadata_startup_script = data.template_file.startup_script.rendered
+
+  # Use the custom service account with full cloud-platform access scope,
+  # but restricted by the IAM roles assigned above.
+  service_account {
+    email  = google_service_account.vm_sa.email
+    scopes = ["cloud-platform"]
+  }
 }
 
 data "template_file" "startup_script" {
