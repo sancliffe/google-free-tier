@@ -1,23 +1,34 @@
-# 1. DuckDNS Token
-printf "your-duckdns-token" | gcloud secrets create duckdns_token --data-file=-
+#!/bin/bash
+#
+# This script interactively prompts for secrets and creates them in GCP Secret Manager.
 
-# 2. Email Address
-printf "your-email@example.com" | gcloud secrets create email_address --data-file=-
+set -euo pipefail
 
-# 3. Domain Name
-printf "your-domain.duckdns.org" | gcloud secrets create domain_name --data-file=-
+create_secret() {
+    local secret_name="$1"
+    local prompt_text="$2"
+    local secret_value
 
-# 4. Backup Bucket Name
-printf "your-backup-bucket-name" | gcloud secrets create gcs_bucket_name --data-file=-
+    read -sp "$prompt_text: " secret_value
+    echo
+    if [[ -z "$secret_value" ]]; then
+        echo "Secret value cannot be empty." >&2
+        exit 1
+    fi
+    printf "%s" "$secret_value" | gcloud secrets create "$secret_name" --data-file=-
+}
 
-# 5. Terraform State Bucket Name
-printf "your-tf-state-bucket-name" | gcloud secrets create tf_state_bucket --data-file=-
+create_secret "duckdns_token" "Enter your DuckDNS token"
+create_secret "email_address" "Enter your email address for SSL renewal notices"
+create_secret "domain_name" "Enter your domain name (e.g., my.duckdns.org)"
+create_secret "gcs_bucket_name" "Enter your GCS bucket name for backups"
+create_secret "tf_state_bucket" "Enter your Terraform state bucket name"
+create_secret "backup_dir" "Enter the directory to back up (e.g., /var/www/html)"
 
-# 6. Backup Directory (e.g., /var/www/html)
-printf "/var/www/html" | gcloud secrets create backup_dir --data-file=-
-
-# 7. Grant Cloud Build permission to access these secrets
+# Grant Cloud Build permission to access these secrets
 PROJECT_NUMBER=$(gcloud projects describe $(gcloud config get-value project) --format="value(projectNumber)")
 gcloud projects add-iam-policy-binding $(gcloud config get-value project) \
     --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
     --role="roles/secretmanager.secretAccessor"
+
+echo "Secrets created and permissions granted."

@@ -2,7 +2,7 @@ terraform {
   required_providers {
     google = {
       source  = "hashicorp/google"
-      version = "4.51.0"
+      version = "~> 4.80"
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
@@ -19,63 +19,6 @@ provider "google" {
   project = var.project_id
   region  = var.region
   zone    = var.zone
-}
-
-variable "project_id" {
-  description = "The ID of the GCP project."
-  type        = string
-}
-
-variable "region" {
-  description = "The region to deploy the resources in."
-  type        = string
-  default     = "us-east1"
-}
-
-variable "zone" {
-  description = "The zone to deploy the resources in."
-  type        = string
-  default     = "us-east1-b"
-}
-
-variable "machine_type" {
-  description = "The machine type for the VM."
-  type        = string
-  default     = "e2-micro"
-}
-
-variable "image_family" {
-  description = "The image family for the VM."
-  type        = string
-  default     = "debian-12"
-}
-
-variable "image_project" {
-  description = "The image project for the VM."
-  type        = string
-  default     = "debian-cloud"
-}
-
-variable "boot_disk_size" {
-  description = "The size of the boot disk in GB."
-  type        = number
-  default     = 30
-}
-
-variable "boot_disk_type" {
-  description = "The type of the boot disk."
-  type        = string
-  default     = "pd-standard"
-}
-
-variable "email_address" {
-  description = "The email address for alert notifications."
-  type        = string
-}
-
-variable "domain_name" {
-  description = "The domain name to monitor."
-  type        = string
 }
 
 # --- Service Account & IAM ---

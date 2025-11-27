@@ -8,9 +8,8 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 
 # Install app dependencies
-# CHANGED: Use 'npm install' instead of 'npm ci' so the build works
-# even if package-lock.json is missing.
-RUN npm install --only=production
+# Use 'npm ci' for reproducible builds.
+RUN npm ci --only=production
 
 # Bundle app source
 # Change ownership of the files to the 'node' user

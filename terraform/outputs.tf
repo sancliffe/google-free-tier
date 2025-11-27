@@ -13,9 +13,15 @@ output "gke_cluster_name" {
   value       = google_container_cluster.default.name
 }
 
+data "kubernetes_service" "hello_gke_service" {
+  metadata {
+    name = "hello-gke-service"
+  }
+}
+
 output "kubernetes_service_ip" {
   description = "The public IP address of the Kubernetes service."
-  value       = kubernetes_service.hello_gke.status[0].load_balancer[0].ingress[0].ip
+  value       = data.kubernetes_service.hello_gke_service.status.0.load_balancer.0.ingress.0.ip
 }
 
 output "region" {
