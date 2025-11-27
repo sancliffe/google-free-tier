@@ -21,15 +21,24 @@ steps:
     - 'init'
 
 # 4. Apply Terraform configuration
+# We switch entrypoint to 'sh' to allow environment variable injection from Secret Manager
 - name: 'hashicorp/terraform:1.0.0'
-  entrypoint: 'terraform'
+  entrypoint: 'sh'
   dir: 'terraform'
+  secretEnv: 
+    - 'TF_VAR_duckdns_token'
+    - 'TF_VAR_email_address'
+    - 'TF_VAR_domain_name'
+    - 'TF_VAR_gcs_bucket_name'
+    - 'TF_VAR_tf_state_bucket'
+    - 'TF_VAR_backup_dir'
   args:
-    - 'apply'
-    - '-auto-approve'
-    - '-var=project_id=${PROJECT_ID}'
-    - '-var=region=${_REGION}'
-    - '-var=image_tag=${SHORT_SHA}'
+    - '-c'
+    - |
+      terraform apply -auto-approve \
+        -var="project_id=${PROJECT_ID}" \
+        -var="region=${_REGION}" \
+        -var="image_tag=${SHORT_SHA}"
 
 # Store the image name for other builds
 images:
@@ -40,3 +49,19 @@ substitutions:
   _REGION: 'us-central1'
   _REPO_NAME: 'gke-apps'
   _IMAGE_NAME: 'hello-gke'
+
+# Map Secret Manager secrets to Environment Variables
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_ID/secrets/duckdns_token/versions/latest
+    env: 'TF_VAR_duckdns_token'
+  - versionName: projects/$PROJECT_ID/secrets/email_address/versions/latest
+    env: 'TF_VAR_email_address'
+  - versionName: projects/$PROJECT_ID/secrets/domain_name/versions/latest
+    env: 'TF_VAR_domain_name'
+  - versionName: projects/$PROJECT_ID/secrets/gcs_bucket_name/versions/latest
+    env: 'TF_VAR_gcs_bucket_name'
+  - versionName: projects/$PROJECT_ID/secrets/tf_state_bucket/versions/latest
+    env: 'TF_VAR_tf_state_bucket'
+  - versionName: projects/$PROJECT_ID/secrets/backup_dir/versions/latest
+    env: 'TF_VAR_backup_dir'

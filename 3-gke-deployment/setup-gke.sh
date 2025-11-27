@@ -60,7 +60,58 @@ main() {
     echo
     read -p "Press [Enter] after you have successfully pushed the image..."
 
-    # --- 3. Deploy with Terraform ---
+    # --- 3. Retrieve Infrastructure Config ---
+    log_info "Fetching configuration to prevent overwriting VM settings..."
+    
+    # Helper to fetch secret or prompt user
+    get_config() {
+        local name="$1"
+        local description="$2"
+        local val=""
+        
+        # 1. Try fetching from Secret Manager
+        if val=$(gcloud secrets versions access latest --secret="$name" --quiet 2>/dev/null); then
+            log_info "Loaded $description from Secret Manager."
+        else
+            # 2. Fallback to Prompt
+            log_warn "Secret '$name' not found in Secret Manager."
+            read -p "Please enter your $description: " val
+        fi
+        
+        if [[ -z "$val" ]]; then
+            log_error "$description is required to proceed safely."
+            exit 1
+        fi
+        echo "$val"
+    }
+
+    # Fetch variables required by main.tf so we don't overwrite them with "none"
+    local duckdns_token
+    duckdns_token=$(get_config "duckdns_token" "DuckDNS Token")
+
+    local email_address
+    email_address=$(get_config "email_address" "Email Address")
+
+    local domain_name
+    domain_name=$(get_config "domain_name" "Domain Name")
+
+    local gcs_bucket_name
+    gcs_bucket_name=$(get_config "gcs_bucket_name" "Backup GCS Bucket Name")
+
+    local tf_state_bucket
+    tf_state_bucket=$(get_config "tf_state_bucket" "Terraform State Bucket Name")
+
+    # Backup dir is less critical, can default
+    local backup_dir
+    if val=$(gcloud secrets versions access latest --secret="backup_dir" --quiet 2>/dev/null); then
+         backup_dir="$val"
+         log_info "Loaded Backup Directory from Secret Manager."
+    else
+         backup_dir="/var/www/html"
+         log_info "Using default backup directory: $backup_dir"
+    fi
+
+    # --- 4. Deploy with Terraform ---
     log_info "Navigating to the Terraform directory..."
     cd "$(dirname "$0")/../terraform"
 
@@ -69,20 +120,22 @@ main() {
 
     log_info "Deploying resources with Terraform..."
     log_warn "This will take about 5-10 minutes."
+    
+    # Pass the real values to Terraform
     terraform apply -auto-approve \
         -var="project_id=${project_id}" \
         -var="region=${region}" \
         -var="image_tag=${image_tag}" \
-        -var="duckdns_token=none" \
-        -var="email_address=none@none.com" \
-        -var="domain_name=none.com" \
-        -var="gcs_bucket_name=none" \
-        -var="tf_state_bucket=none" \
-        -var="backup_dir=/tmp"
+        -var="duckdns_token=${duckdns_token}" \
+        -var="email_address=${email_address}" \
+        -var="domain_name=${domain_name}" \
+        -var="gcs_bucket_name=${gcs_bucket_name}" \
+        -var="tf_state_bucket=${tf_state_bucket}" \
+        -var="backup_dir=${backup_dir}"
 
     log_success "Terraform apply complete. GKE cluster and application are deployed."
 
-    # --- 4. Final Instructions ---
+    # --- 5. Final Instructions ---
     log_info "---------------------------------------------------------"
     log_info "To find the public IP address for your service, run:"
     echo
@@ -96,4 +149,3 @@ main() {
 }
 
 main
-
