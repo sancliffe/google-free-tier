@@ -26,11 +26,6 @@ variable "image_tag" {
   default     = "latest"
 }
 
-variable "tf_state_bucket" {
-  description = "The name of the GCS bucket to store the Terraform state. This must be globally unique."
-  type        = string
-}
-
 variable "backup_dir" {
   description = "The absolute path of the directory to back up."
   type        = string
