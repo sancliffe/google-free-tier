@@ -49,6 +49,13 @@ resource "google_project_iam_member" "storage_admin" {
   member  = "serviceAccount:${google_service_account.vm_sa.email}"
 }
 
+# Allow accessing secrets
+resource "google_project_iam_member" "secret_accessor" {
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.vm_sa.email}"
+}
+
 # --- Compute Engine ---
 
 # Creates a Google Compute Engine instance.
@@ -83,14 +90,6 @@ resource "google_compute_instance" "default" {
 
 data "template_file" "startup_script" {
   template = file("startup-script.sh.tpl")
-
-  vars = {
-    domain_name     = var.domain_name
-    duckdns_token   = var.duckdns_token
-    email_address   = var.email_address
-    gcs_bucket_name = var.gcs_bucket_name
-    backup_dir      = var.backup_dir
-  }
 }
 
 # Creates a firewall rule to allow HTTP and HTTPS traffic.
