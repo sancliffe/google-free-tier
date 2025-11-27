@@ -21,7 +21,7 @@ This command creates a new `e2-micro` instance (part of the free tier) running D
 # From your local machine
 gcloud compute instances create free-tier-vm \
     --machine-type=e2-micro \
-    --zone=us-east1-b \
+        --zone=us-central1-a \ \
     --image-family=debian-12 \
     --image-project=debian-cloud \
     --boot-disk-size=30GB \
@@ -37,7 +37,7 @@ This command adds network tags to the VM, allowing HTTP and HTTPS traffic. The c
 # From your local machine
 gcloud compute instances add-tags free-tier-vm \
     --tags=http-server,https-server \
-    --zone=us-east1-b
+        --zone=us-central1-a \
 ```
 
 ### 3. Setup Monitoring and Alerting 📊 (Optional)
@@ -64,7 +64,7 @@ bash ./1-gcp-setup/4-create-secrets.sh
 SSH into your new VM to run these scripts.
 
 ```bash
-gcloud compute ssh free-tier-vm --zone=us-east1-b
+gcloud compute ssh free-tier-vm     --zone=us-central1-a \
 ```
 
 The scripts in `2-host-setup/` are numbered for clarity. It is recommended to run them in order. They are **idempotent**, meaning they can be safely re-run without causing issues.
