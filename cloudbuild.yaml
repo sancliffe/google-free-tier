@@ -5,7 +5,7 @@ steps:
     - 'build'
     - '-t'
     - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${SHORT_SHA}'
-    - './3-gke-deployment/app'
+    - './3-cloud-run-deployment/app'
 
 # 2. Push the Docker image to Artifact Registry
 - name: 'gcr.io/cloud-builders/docker'
@@ -14,8 +14,7 @@ steps:
     - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${SHORT_SHA}'
 
 # 3. Initialize Terraform
-# CHANGED: Switched to 'sh' to allow environment variable injection for backend config
-- name: 'hashicorp/terraform:1.0.0'
+- name: 'hashicorp/terraform:1.8.4'
   entrypoint: 'sh'
   dir: 'terraform'
   secretEnv: ['TF_VAR_tf_state_bucket']
@@ -24,8 +23,7 @@ steps:
     - 'terraform init -backend-config="bucket=$$TF_VAR_tf_state_bucket"'
 
 # 4. Apply Terraform configuration
-# We switch entrypoint to 'sh' to allow environment variable injection from Secret Manager
-- name: 'hashicorp/terraform:1.0.0'
+- name: 'hashicorp/terraform:1.8.4'
   entrypoint: 'sh'
   dir: 'terraform'
   secretEnv: 
@@ -51,7 +49,7 @@ images:
 substitutions:
   _REGION: 'us-central1'
   _REPO_NAME: 'gke-apps'
-  _IMAGE_NAME: 'hello-gke'
+  _IMAGE_NAME: 'hello-cloud-run'
 
 # Map Secret Manager secrets to Environment Variables
 availableSecrets:

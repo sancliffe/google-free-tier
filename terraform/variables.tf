@@ -20,12 +20,6 @@ variable "gcs_bucket_name" {
   type        = string
 }
 
-variable "gke_cluster_name" {
-  description = "The name of the GKE cluster."
-  type        = string
-  default     = "autopilot-cluster-1"
-}
-
 variable "image_tag" {
   description = "The tag for the Docker image."
   type        = string

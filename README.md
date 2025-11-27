@@ -136,36 +136,35 @@ sudo bash ./2-host-setup/4-setup-ssl.sh "your-domain.duckdns.org" "your-email@ex
 sudo bash ./2-host-setup/6-setup-backups.sh "your-backup-bucket-name" "/var/www/html"
 ```
 
-## Phase 3: 🚀 Deploying to GKE (Advanced)
+## Phase 3: 🚀 Deploying to Cloud Run (Advanced)
 
-For a more modern, cloud-native approach, you can deploy a containerized application using the free tier of **Google Kubernetes Engine (GKE)**. This phase uses GKE's "Autopilot" mode, where Google manages the underlying infrastructure for you.
+For a modern, serverless approach, you can deploy a containerized application using **Google Cloud Run**. This service has a generous free tier and automatically scales to zero, making it a cost-effective choice.
 
-The `3-gke-deployment/` directory contains a sample "Hello World" Node.js application, a `Dockerfile` to containerize it, and the necessary Kubernetes configuration files.
+The `3-cloud-run-deployment/` directory contains a sample "Hello World" Node.js application and a `Dockerfile` to containerize it.
 
 ### Prerequisites
 
 Before running the setup script, you must have the following tools installed on your **local machine**:
 - `gcloud` (already used in Phase 1)
 - `docker` ([Installation Guide](https://docs.docker.com/get-docker/))
-- `kubectl` ([Installation Guide](https://kubernetes.io/docs/tasks/tools/install-kubectl-gcloud/))
 
 ### Deploying the Application
 
-The guided script will walk you through the entire process, from creating the GKE cluster to deploying the application.
+The guided script will walk you through the entire process, from building the container to deploying it to Cloud Run.
 
 ```bash
 # From your local machine
-bash ./3-gke-deployment/setup-gke.sh
+bash ./3-cloud-run-deployment/setup-cloud-run.sh
 ```
 The script will prompt you to run a few `docker` commands in a separate terminal. Follow the on-screen instructions carefully. This process includes building the container image and pushing it to Google's Artifact Registry.
 
-Once complete, the script will provide you with the command to watch for your service's public IP address.
+Once complete, the script will provide you with the command to find the URL of your service.
 
 ---
 
 ## Phase 4: 🤖 Automated Deployment with Terraform
 
-The `terraform/` directory contains a Terraform project to provision the entire infrastructure, including the GCE instance, firewall rules, monitoring, and GKE cluster.
+The `terraform/` directory contains a Terraform project to provision the entire infrastructure, including the GCE instance, firewall rules, monitoring, and the Cloud Run service.
 
 ### Prerequisites
 
@@ -182,15 +181,14 @@ The `terraform/` directory contains a Terraform project to provision the entire 
 3.  **Configuration File:** Create a `terraform.tfvars` file in the `terraform/` directory. This file will contain your project-specific variables.
     ```hcl
     project_id      = "your-gcp-project-id"
-    region          = "us-east1"
-    zone            = "us-east1-b"
+    region          = "us-central1"
+    zone            = "us-central1-a"
     email_address   = "your-email@example.com"
     domain_name     = "your-domain.com"
     duckdns_token   = "your-duckdns-token"
     gcs_bucket_name = "your-backup-bucket-name"
     backup_dir      = "/var/www/html"
     tf_state_bucket = "your-terraform-state-bucket-name"
-    gke_cluster_name = "my-gke-cluster"
     image_tag       = "latest"
     ```
 
