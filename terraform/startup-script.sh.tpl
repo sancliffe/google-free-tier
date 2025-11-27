@@ -16,3 +16,4 @@ sudo /tmp/2-host-setup/3-setup-duckdns.sh "$DOMAIN_NAME" "$DUCKDNS_TOKEN"
 sudo /tmp/2-host-setup/4-setup-ssl.sh "$DOMAIN_NAME" "$EMAIL_ADDRESS"
 sudo /tmp/2-host-setup/5-adjust-firewall.sh
 sudo /tmp/2-host-setup/6-setup-backups.sh "$GCS_BUCKET_NAME" "$BACKUP_DIR"
+sudo /tmp/2-host-setup/7-setup-security.sh

@@ -121,6 +121,14 @@ sudo bash ./2-host-setup/6-setup-backups.sh "your-backup-bucket-name" "/var/www/
 ```
 ⚠️ **Important:** Before running, you must create the GCS bucket and ensure your VM has permission to write to it. This is typically configured by default.
 
+### 7. Harden Security (Fail2Ban) 🛡️ (Recommended)
+Installs and configures Fail2Ban to protect against brute-force attacks.
+
+```bash
+# On the VM
+sudo bash ./2-host-setup/7-setup-security.sh
+```
+
 ### 🚀 Advanced Usage: Automation
 
 The `setup_duckdns.sh`, `setup_ssl.sh`, and `setup_backups.sh` scripts can accept arguments to bypass the interactive prompts:
