@@ -35,6 +35,13 @@ variable "project_id" {
   type        = string
 }
 
+# --- UPDATE: Added Billing Account ID ---
+variable "billing_account_id" {
+  description = "The alphanumeric ID of the billing account (e.g., XXXXXX-XXXXXX-XXXXXX)."
+  type        = string
+  sensitive   = true
+}
+
 # --- Feature Flags ---
 
 variable "enable_vm" {

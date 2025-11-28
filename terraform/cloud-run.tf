@@ -41,6 +41,27 @@ resource "google_cloud_run_v2_service" "default" {
         name  = "APP_VERSION"
         value = var.image_tag
       }
+
+    # IMPROVEMENT: Add Health Probes
+      startup_probe {
+        initial_delay_seconds = 0
+        timeout_seconds       = 1
+        period_seconds        = 3
+        failure_threshold     = 3
+        tcp_socket {
+          port = 8080
+        }
+      }
+
+      liveness_probe {
+        http_get {
+          path = "/"
+          port = 8080
+        }
+        period_seconds    = 10
+        timeout_seconds   = 5
+        failure_threshold = 3
+      }
     }
   }
 

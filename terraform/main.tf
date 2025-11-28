@@ -103,7 +103,8 @@ data "template_file" "startup_script" {
   template = file("startup-script.sh.tpl")
 }
 
-resource "google_compute_firewall" "default" {
+# Creates a firewall rule to allow HTTP and HTTPS traffic from anywhere.
+resource "google_compute_firewall" "allow_http_https" {
   count   = var.enable_vm ? 1 : 0
   name    = "allow-http-https"
   network = "default"
@@ -114,6 +115,24 @@ resource "google_compute_firewall" "default" {
   }
 
   target_tags = ["http-server", "https-server"]
+  source_ranges = ["0.0.0.0/0"]
+}
+
+# IMPROVEMENT: Restrict SSH to IAP only
+resource "google_compute_firewall" "allow_ssh_iap" {
+  count   = var.enable_vm ? 1 : 0
+  name    = "allow-ssh-from-iap"
+  network = "default"
+
+  allow {
+    protocol = "tcp"
+    ports    = ["22"]
+  }
+
+  target_tags = ["http-server", "https-server"] # Or add a specific "ssh-enabled" tag
+  
+  # Allow connections only from Google IAP range
+  source_ranges = ["35.235.240.0/20"]
 }
 
 # Bucket is needed for VM backups and storing setup scripts
