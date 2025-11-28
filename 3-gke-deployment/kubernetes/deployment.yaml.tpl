@@ -16,7 +16,6 @@ spec:
         app: hello-gke
     spec:
       # --- Security Hardening ---
-      # Enforce non-root execution at the pod level
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000 # 'node' user UID
@@ -29,9 +28,14 @@ spec:
         ports:
         - containerPort: 8080
       
+        # Inject Environment Variables
+        env:
+        - name: GOOGLE_CLOUD_PROJECT
+          value: "${project_id}"
+        - name: ASSETS_URL
+          value: "${assets_url}"
+
         # --- GKE Autopilot Resource Requirements ---
-        # Requests are minimized here, but still incur cost.
-        # Minimum for Autopilot is often 250m cpu / 512Mi memory.
         resources:
           requests:
             cpu: "250m"
@@ -41,7 +45,6 @@ spec:
             memory: "512Mi"
 
         # --- Health Probes ---
-        # Liveness: Restarts the container if it freezes or deadlocks.
         livenessProbe:
           httpGet:
             path: /healthz
@@ -49,7 +52,6 @@ spec:
           initialDelaySeconds: 15
           periodSeconds: 20
           
-        # Readiness: Don't send traffic until this passes (e.g., during startup).
         readinessProbe:
           httpGet:
             path: /healthz

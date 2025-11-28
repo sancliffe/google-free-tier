@@ -24,6 +24,12 @@ variable "tf_state_bucket" {
   type        = string
 }
 
+# Added: Variable for the new public assets bucket
+variable "assets_bucket_name" {
+  description = "The name of the GCS bucket for public static assets."
+  type        = string
+}
+
 variable "image_tag" {
   description = "The tag for the Docker image."
   type        = string
@@ -80,7 +86,6 @@ variable "region" {
   default     = "us-central1"
 }
 
-# NEW: Decouple registry region from deployment region
 variable "artifact_registry_region" {
   description = "The region where the Artifact Registry is located (defaults to setup script value)."
   type        = string

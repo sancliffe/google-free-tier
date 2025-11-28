@@ -3,6 +3,7 @@ const { Firestore } = require('@google-cloud/firestore');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+const ASSETS_URL = process.env.ASSETS_URL || '';
 
 // Initialize Firestore
 const firestore = new Firestore();
@@ -25,12 +26,26 @@ app.get('/', async (req, res) => {
       count = 1;
       await docRef.set({ val: count });
     }
-    
-    res.send(`Hello from Google Kubernetes Engine! Visitor Count: ${count}`);
   } catch (err) {
     console.error('Firestore error:', err);
-    res.send(`Hello from Google Kubernetes Engine! (DB Error)`);
   }
+
+  const html = `
+    <html>
+      <head><title>GKE App</title></head>
+      <body style="font-family: sans-serif; text-align: center; padding: 2rem;">
+        <h1>Hello from Google Kubernetes Engine!</h1>
+        <p>Visitor Count: <strong>${count}</strong></p>
+        <hr/>
+        <p>
+          Static Asset Test: 
+          <a href="${ASSETS_URL}/message.txt" target="_blank">View message.txt from GCS</a>
+        </p>
+      </body>
+    </html>
+  `;
+  
+  res.send(html);
 });
 
 const server = app.listen(PORT, () => {
@@ -45,7 +60,6 @@ const gracefulShutdown = () => {
     process.exit(0);
   });
 
-  // Force close server after 10 seconds
   setTimeout(() => {
     console.error('Could not close connections in time, forcefully shutting down');
     process.exit(1);

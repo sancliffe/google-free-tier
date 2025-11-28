@@ -17,7 +17,6 @@ resource "google_container_cluster" "default" {
   network          = "default"
   subnetwork       = "default"
   
-  # Allow Terraform to destroy the cluster without manual intervention
   deletion_protection = false
 
   depends_on = [
@@ -27,15 +26,12 @@ resource "google_container_cluster" "default" {
 
 data "google_client_config" "default" {}
 
-# Configure the Kubernetes provider.
-# We use 'try' to handle cases where the GKE cluster is not enabled (count = 0).
 provider "kubernetes" {
   host                   = try(google_container_cluster.default[0].endpoint, "")
   token                  = data.google_client_config.default.access_token
   cluster_ca_certificate = try(base64decode(google_container_cluster.default[0].master_auth[0].cluster_ca_certificate), "")
 }
 
-# Configure the Kubectl provider.
 provider "kubectl" {
   host                   = try(google_container_cluster.default[0].endpoint, "")
   token                  = data.google_client_config.default.access_token
@@ -44,16 +40,16 @@ provider "kubectl" {
 }
 
 locals {
-  # Construct image URL using the correct artifact registry region
   image_url = "${var.artifact_registry_region}-docker.pkg.dev/${var.project_id}/gke-apps/hello-gke:${var.image_tag}"
 
-  # Render the deployment manifest
+  # Pass variables to the deployment template
   deployment_yaml = templatefile("${path.module}/../3-gke-deployment/kubernetes/deployment.yaml.tpl", {
-    image = local.image_url
+    image      = local.image_url
+    project_id = var.project_id
+    assets_url = "https://storage.googleapis.com/${google_storage_bucket.assets_bucket.name}"
   })
 }
 
-# Apply the Kubernetes manifests
 resource "kubectl_manifest" "gke_deployment" {
   count      = var.enable_gke ? 1 : 0
   yaml_body  = local.deployment_yaml

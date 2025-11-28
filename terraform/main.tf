@@ -29,7 +29,6 @@ resource "google_service_account" "vm_sa" {
   display_name = "Free Tier VM Service Account"
 }
 
-# Allow writing logs
 resource "google_project_iam_member" "log_writer" {
   count   = var.enable_vm ? 1 : 0
   project = var.project_id
@@ -37,7 +36,6 @@ resource "google_project_iam_member" "log_writer" {
   member  = "serviceAccount:${google_service_account.vm_sa[0].email}"
 }
 
-# Allow writing metrics
 resource "google_project_iam_member" "metric_writer" {
   count   = var.enable_vm ? 1 : 0
   project = var.project_id
@@ -45,7 +43,6 @@ resource "google_project_iam_member" "metric_writer" {
   member  = "serviceAccount:${google_service_account.vm_sa[0].email}"
 }
 
-# Allow accessing secrets
 resource "google_project_iam_member" "secret_accessor" {
   count   = var.enable_vm ? 1 : 0
   project = var.project_id
@@ -78,7 +75,6 @@ resource "google_compute_instance" "default" {
 
   tags = ["http-server", "https-server"]
 
-  # UPDATED: Use templatefile to inject the bucket name safely
   metadata_startup_script = templatefile("${path.module}/startup-script.sh.tpl", {
     gcs_bucket_name = google_storage_bucket.backup_bucket[0].name
   })
@@ -121,6 +117,8 @@ resource "google_compute_firewall" "allow_ssh_iap" {
   source_ranges = ["35.235.240.0/20"]
 }
 
+# --- Backups Bucket ---
+
 resource "google_storage_bucket" "backup_bucket" {
   count                       = var.enable_vm ? 1 : 0
   name                        = var.gcs_bucket_name
@@ -154,6 +152,37 @@ resource "google_storage_bucket_object" "setup_scripts" {
   name     = "setup-scripts/${each.value}"
   source   = "${path.module}/../2-host-setup/${each.value}"
   bucket   = google_storage_bucket.backup_bucket[0].name
+}
+
+# --- Static Assets Bucket (NEW) ---
+
+resource "google_storage_bucket" "assets_bucket" {
+  name                        = var.assets_bucket_name
+  location                    = var.region
+  uniform_bucket_level_access = true
+  force_destroy               = true # CAUTION: Deletes bucket even if it has files
+
+  cors {
+    origin          = ["*"]
+    method          = ["GET", "HEAD", "OPTIONS"]
+    response_header = ["*"]
+    max_age_seconds = 3600
+  }
+}
+
+# Make the assets bucket public
+resource "google_storage_bucket_iam_member" "assets_public_read" {
+  bucket = google_storage_bucket.assets_bucket.name
+  role   = "roles/storage.objectViewer"
+  member = "allUsers"
+}
+
+# Upload a demo asset
+resource "google_storage_bucket_object" "demo_asset" {
+  name         = "message.txt"
+  content      = "This is a static asset served from Google Cloud Storage!"
+  content_type = "text/plain"
+  bucket       = google_storage_bucket.assets_bucket.name
 }
 
 # --- Monitoring (VM Specific) ---
@@ -195,7 +224,6 @@ resource "google_monitoring_alert_policy" "default" {
     condition_threshold {
       filter          = "metric.type=\"monitoring.googleapis.com/uptime_check/check_passed\" AND resource.labels.check_id=\"${google_monitoring_uptime_check_config.http[0].uptime_check_id}\""
       duration        = "300s"
-      # FIXED: Alert when check_passed < 1 (i.e., 0/Fail)
       comparison      = "COMPARISON_LT"
       threshold_value = 1
       trigger {

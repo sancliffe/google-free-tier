@@ -43,7 +43,6 @@ resource "google_cloud_run_v2_service" "default" {
     service_account = google_service_account.cloud_run_sa[0].email
 
     containers {
-      # UPDATE: Use artifact_registry_region instead of deployment region
       image = "${var.artifact_registry_region}-docker.pkg.dev/${var.project_id}/gke-apps/hello-cloud-run:${var.image_tag}"
       
       # Inject the version/tag as an environment variable
@@ -58,7 +57,12 @@ resource "google_cloud_run_v2_service" "default" {
         value = var.project_id
       }
 
-      # IMPROVEMENT: Add Health Probes
+      # Added: Inject URL for static assets bucket
+      env {
+        name  = "ASSETS_URL"
+        value = "https://storage.googleapis.com/${google_storage_bucket.assets_bucket.name}"
+      }
+
       startup_probe {
         initial_delay_seconds = 0
         timeout_seconds       = 1
@@ -92,7 +96,6 @@ resource "google_cloud_run_v2_service" "default" {
   ]
 }
 
-# Allow unauthenticated access to the Cloud Run service.
 resource "google_cloud_run_service_iam_binding" "default" {
   count    = var.enable_cloud_run ? 1 : 0
   location = google_cloud_run_v2_service.default[0].location
@@ -101,7 +104,6 @@ resource "google_cloud_run_service_iam_binding" "default" {
   members  = ["allUsers"]
 }
 
-# Map the custom domain to the Cloud Run service (Optional)
 resource "google_cloud_run_domain_mapping" "default" {
   count    = (var.enable_cloud_run && var.enable_cloud_run_domain_mapping) ? 1 : 0
   location = var.region
