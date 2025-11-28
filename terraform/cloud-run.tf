@@ -35,6 +35,12 @@ resource "google_cloud_run_v2_service" "default" {
 
     containers {
       image = "${var.region}-docker.pkg.dev/${var.project_id}/gke-apps/hello-cloud-run:${var.image_tag}"
+      
+      # Inject the version/tag as an environment variable
+      env {
+        name  = "APP_VERSION"
+        value = var.image_tag
+      }
     }
   }
 
@@ -45,7 +51,7 @@ resource "google_cloud_run_v2_service" "default" {
 
   depends_on = [
     google_project_service.cloud_run_apis,
-    google_project_iam_member.ar_reader # Wait for permissions to propagate
+    google_project_iam_member.ar_reader
   ]
 }
 

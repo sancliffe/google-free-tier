@@ -37,5 +37,6 @@ sudo -E /tmp/2-host-setup/4-setup-ssl.sh
 sudo /tmp/2-host-setup/5-adjust-firewall.sh
 sudo -E /tmp/2-host-setup/6-setup-backups.sh
 sudo /tmp/2-host-setup/7-setup-security.sh
+sudo /tmp/2-host-setup/8-setup-ops-agent.sh
 
 echo "--- Startup Script Complete ---"
