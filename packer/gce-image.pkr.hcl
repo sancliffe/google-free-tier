@@ -62,7 +62,9 @@ build {
       "sudo /tmp/2-host-setup/1-create-swap.sh",
       "sudo /tmp/2-host-setup/2-install-nginx.sh",
       "echo 'Note: Skipping DuckDNS, SSL, and backup setup in Packer image.'",
-      "echo 'These often require live credentials and are better handled on first boot or via a different mechanism.'"
+      "echo 'These often require live credentials and are better handled on first boot or via a different mechanism.'",
+      "echo 'Cleaning up temporary setup scripts...'",
+      "sudo rm -rf /tmp/2-host-setup"
     ]
   }
 }

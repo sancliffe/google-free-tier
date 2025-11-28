@@ -72,13 +72,47 @@ main() {
         log_info "Using domain and email from environment/arguments."
     fi
     
-    # ... (Rest of logic checks certbot, runs check_dns, runs certbot --nginx)
     # Ensure dependencies are installed
     if ! command -v certbot &> /dev/null; then
         log_info "Certbot is not installed. Installing now..."
+        wait_for_apt
         apt-get update -qq
         apt-get install -y -qq certbot python3-certbot-nginx
         log_success "Certbot installed."
+    fi
+
+    # Ensure Nginx is configured for this domain
+    # Certbot needs a server block with a matching server_name to work correctly
+    local nginx_config="/etc/nginx/sites-available/${DOMAIN}"
+    if [[ ! -f "${nginx_config}" ]]; then
+        log_info "Creating Nginx server block for ${DOMAIN}..."
+        
+        cat <<EOF > "${nginx_config}"
+server {
+    listen 80;
+    server_name ${DOMAIN};
+    
+    root /var/www/html;
+    index index.html index.htm index.nginx-debian.html;
+
+    location / {
+        try_files \$uri \$uri/ =404;
+    }
+}
+EOF
+        # Link to enabled sites
+        ln -sf "${nginx_config}" "/etc/nginx/sites-enabled/"
+        
+        # Remove default config if it exists to avoid conflicts
+        if [[ -f "/etc/nginx/sites-enabled/default" ]]; then
+            log_info "Disabling default Nginx config..."
+            rm "/etc/nginx/sites-enabled/default"
+        fi
+
+        log_info "Reloading Nginx to apply changes..."
+        systemctl reload nginx
+    else
+        log_info "Nginx configuration for ${DOMAIN} already exists."
     fi
 
     check_dns

@@ -18,6 +18,7 @@ main() {
         log_success "Fail2Ban is already installed. Skipping installation."
     else
         log_info "Installing Fail2Ban..."
+        wait_for_apt
         apt-get update -qq
         apt-get install -y -qq fail2ban
         log_success "Fail2Ban installed successfully."

@@ -28,6 +28,8 @@ main() {
     if dpkg-query -W nginx &>/dev/null; then
         log_success "Nginx is already installed. Skipping installation."
     else
+        wait_for_apt
+        
         log_info "Updating package lists..."
         # -qq is quieter than -q
         apt-get update -qq

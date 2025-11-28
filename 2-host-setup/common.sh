@@ -74,3 +74,27 @@ ensure_root() {
         exit 1
     fi
 }
+
+# --- Stability: Wait for Apt Locks ---
+wait_for_apt() {
+    local max_retries=30
+    local count=0
+    
+    log_info "Checking for apt locks..."
+    
+    # Check for lock files used by dpkg/apt
+    while fuser /var/lib/dpkg/lock >/dev/null 2>&1 || \
+          fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
+          fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
+        
+        log_warn "Apt lock is held by another process. Waiting (attempt $((count+1))/${max_retries})..."
+        sleep 2
+        count=$((count+1))
+        
+        if [[ "$count" -ge "$max_retries" ]]; then
+            log_error "Timed out waiting for apt lock."
+            # Proceeding anyway might fail, but we've waited 60s
+            break
+        fi
+    done
+}
