@@ -2,10 +2,12 @@
 
 Setup and configure a web server on a Google Cloud Free Tier `e2-micro` VM, or deploy containerized applications using Cloud Run and GKE Autopilot.
 
+**New in v2.0:** The containerized applications now feature a persistent **Visitor Counter** backed by **Google Cloud Firestore**, demonstrating stateful serverless deployments!
+
 This project offers multiple paths for deployment:
 - **Manual Setup (Phases 1-2):** Step-by-step shell scripts to configure a VM.
-- **Serverless (Phase 3):** Deploy a container to Cloud Run.
-- **Kubernetes (Phase 4):** Deploy a container to GKE Autopilot.
+- **Serverless (Phase 3):** Deploy a Node.js app with Firestore integration to Cloud Run.
+- **Kubernetes (Phase 4):** Deploy a Node.js app with Firestore integration to GKE Autopilot.
 - **Terraform (Phase 5):** Fully automated Infrastructure-as-Code provisioning.
 
 ---
@@ -27,20 +29,20 @@ Before starting, ensure you have the following installed on your **local machine
 ## 💰 Cost Considerations
 
 **Free Tier Resources:**
-- 1 `e2-micro` VM instance (744 hours/month in select regions)
-- 30GB standard persistent disk storage
-- Cloud Run (2 million requests/month, 360,000 GB-seconds/month)
-- Cloud Build (120 build-minutes/day)
-- Cloud Monitoring (first 150 MB of logs per month)
+- **Compute Engine:** 1 `e2-micro` VM instance (744 hours/month in select regions)
+- **Persistent Disk:** 30GB standard persistent disk storage
+- **Cloud Run:** 2 million requests/month, 360,000 GB-seconds/month
+- **Firestore:** 1GB storage, 50,000 reads/day, 20,000 writes/day
+- **Cloud Build:** 120 build-minutes/day
+- **Cloud Monitoring:** First 150 MB of logs per month
 
 **Resources That May Incur Costs:**
-- **GKE Autopilot**: While there's no cluster management fee, you pay for the compute resources (vCPU/RAM) your pods use
-- Cloud Storage (beyond 5GB per month)
-- Network egress (beyond 1GB per month from North America)
-- Cloud Functions (beyond free tier limits)
+- **GKE Autopilot:** While there's no cluster management fee, you pay for the compute resources (vCPU/RAM) your pods use
+- **Cloud Storage:** Storage beyond 5GB per month
+- **Network Egress:** Traffic beyond 1GB per month from North America
+- **Cloud Functions:** Invocations beyond free tier limits (used by the Cost Killer function)
 
-**Recommendation:** 
-- Enable billing budgets and alerts in GCP Console
+**Recommendation:** - Enable billing budgets and alerts in GCP Console
 - Review the [GCP Free Tier documentation](https://cloud.google.com/free/docs/free-cloud-features)
 - The included Cost Killer function (Phase 5) can help prevent overages
 
@@ -303,41 +305,48 @@ sudo systemctl status google-cloud-ops-agent
 
 ## Phase 3: 🚀 Cloud Run Deployment (Serverless)
 
-Deploy a Node.js application to **Google Cloud Run** (Free Tier eligible).
-
-The `3-cloud-run-deployment/` directory contains a sample "Hello World" Node.js application and a `Dockerfile`.
+Deploy a Node.js application to Google Cloud Run (Free Tier eligible). The updated app now connects to Firestore to persist a visitor count.
 
 ### Prerequisites
 - Docker installed on your local machine
 - Artifact Registry created (Phase 1, Step 5)
+- Firestore Database: Ensure you have created a default Firestore database (Native mode recommended) in your project via the GCP Console.
 
 ### Deploy to Cloud Run
-
 ```bash
 # From your local machine (in the repository root)
 bash ./3-cloud-run-deployment/setup-cloud-run.sh
 ```
 
 This script will:
-1. Configure Docker authentication with Artifact Registry
-2. Prompt you to build the Docker container image
-3. Prompt you to push it to Google Artifact Registry
-4. Deploy the service to Cloud Run
 
-The script will prompt you to run Docker commands in a separate terminal. Follow the on-screen instructions carefully.
+Configure Docker authentication with Artifact Registry
+
+Prompt you to build the Docker container image
+
+Prompt you to push it to Google Artifact Registry
+
+Deploy the service to Cloud Run with unauthenticated access
+
+**Features Enabled:**
+
+Firestore Integration: The app increments a counter in the visits collection in your default database.
+
+Static Assets: The app links to a public asset in Google Cloud Storage.
 
 **Validation:** Once complete, get the URL of your service:
+
 ```bash
 gcloud run services describe hello-cloud-run --region=us-central1 --format='value(status.url)'
 ```
 
-Visit the URL in your browser to see your application running.
+Visit the URL in your browser to see your application running and the visitor count incrementing!
 
 ---
 
 ## Phase 4: ☸️ GKE Autopilot Deployment (Kubernetes)
 
-Deploy a Node.js application to **GKE Autopilot**.
+Deploy the same Firestore-connected Node.js application to GKE Autopilot.
 
 ⚠️ **Cost Warning:** While GKE Autopilot eliminates the cluster management fee, the compute resources (vCPU/RAM) used by your pods are billed. A basic deployment typically costs $20-30/month.
 
@@ -345,6 +354,7 @@ Deploy a Node.js application to **GKE Autopilot**.
 - Docker installed
 - Artifact Registry created (Phase 1, Step 5)
 - Terraform installed (the script uses Terraform for cluster provisioning)
+- Firestore Database: Default database created in GCP Console.
 
 ### Deploy to GKE
 
@@ -391,7 +401,7 @@ terraform destroy
 
 ## Phase 5: 🤖 Terraform (Infrastructure as Code)
 
-The `terraform/` directory automates the creation of all infrastructure including VM, GKE cluster, Cloud Run services, monitoring, and "Cost Killer" logic.
+The terraform/ directory automates the creation of all infrastructure including VM, GKE cluster, Cloud Run services, monitoring, and "Cost Killer" logic. It also handles the enabling of Firestore APIs and IAM permissions required for the new application features.
 
 ### Prerequisites
 - Terraform installed on your local machine
@@ -704,32 +714,37 @@ Now every push to the `main` branch will trigger the pipeline.
 - **Solution:** Wait 5-10 minutes after setting up DuckDNS before running SSL script
 - **Check:** `nslookup your-domain.duckdns.org`
 
-**2. Insufficient Permissions**
+**2. Firestore Errors**
+- **Problem:** App crashes with "Error: No default database found" or permission errors.
+- **Solution:** Ensure you have created the default Firestore database in the GCP Console.
+- **Check:** Go to Cloud Console -> Firestore -> Data to verify database existence.
+
+**3. Insufficient Permissions**
 - **Problem:** `gcloud` commands fail with permission errors
 - **Solution:** Ensure you have necessary IAM roles (Compute Admin, Storage Admin, etc.)
 - **Check:** `gcloud projects get-iam-policy PROJECT_ID --flatten="bindings[].members" --filter="bindings.members:user:YOUR_EMAIL"`
 
-**3. Swap File Not Activating**
+**4. Swap File Not Activating**
 - **Problem:** System still runs out of memory
 - **Solution:** Verify swap is enabled: `sudo swapon -a` and check `free -h`
 - **Debug:** Check logs: `journalctl -u swap.target`
 
-**4. Port 80/443 Already in Use**
+**5. Port 80/443 Already in Use**
 - **Problem:** Nginx fails to start
 - **Solution:** Check what's using the ports: `sudo lsof -i :80` and kill the process
 - **Alternative:** `sudo netstat -tulpn | grep :80`
 
-**5. Docker Permission Denied**
+**6. Docker Permission Denied**
 - **Problem:** Cannot connect to Docker daemon
 - **Solution:** Add user to docker group: `sudo usermod -aG docker $USER` then logout/login
 - **Quick fix:** Use `sudo` before docker commands
 
-**6. Terraform State Locked**
+**7. Terraform State Locked**
 - **Problem:** `terraform apply` fails with state lock error
 - **Solution:** If you're sure no other process is running: `terraform force-unlock LOCK_ID`
 - **Prevention:** Always use `terraform destroy` to clean up, never manually delete resources
 
-**7. Cost Killer Not Triggering**
+**8. Cost Killer Not Triggering**
 - **Problem:** Billing exceeded but VM still running
 - **Solution:** Check Cloud Function logs, verify Pub/Sub subscription, ensure IAM permissions
 - **Debug:** 
@@ -738,17 +753,17 @@ Now every push to the `main` branch will trigger the pipeline.
   gcloud pubsub subscriptions list
   ```
 
-**8. Artifact Registry Authentication Fails**
+**9. Artifact Registry Authentication Fails**
 - **Problem:** `docker push` fails with authentication error
 - **Solution:** Re-run: `gcloud auth configure-docker us-central1-docker.pkg.dev`
 - **Alternative:** Use `gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev`
 
-**9. Terraform Backend Initialization Error**
+**10. Terraform Backend Initialization Error**
 - **Problem:** `terraform init` fails to find backend bucket
 - **Solution:** Ensure you created the state bucket in bootstrap step and use correct bucket name
 - **Check:** `gsutil ls | grep tfstate`
 
-**10. GKE Cluster Connection Failed**
+**11. GKE Cluster Connection Failed**
 - **Problem:** `kubectl` commands fail after cluster creation
 - **Solution:** Get credentials: `gcloud container clusters get-credentials CLUSTER_NAME --region=us-central1`
 

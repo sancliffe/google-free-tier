@@ -21,6 +21,9 @@ main() {
     log_info "--- Phase 1: Configuring Swap File ---"
     ensure_root
 
+    # Check disk space before creating swap
+    check_disk_space "/" 2500  # Need ~2.5GB for 2GB swap file
+    
     # Check if the swap file is already configured in /etc/fstab
     #
     # `grep -q` runs in "quiet" mode, not printing the matching line,
@@ -32,7 +35,10 @@ main() {
              log_success "Swap is active."
         else
              log_warn "Swap is configured but not active. Enabling now..."
-             swapon "${SWAP_FILE_PATH}"
+             swapon "${SWAP_FILE_PATH}" || {
+                 log_error "Failed to enable swap."
+                 exit 1
+             }
         fi
         log_info "----------------------------------------"
         exit 0
@@ -40,19 +46,32 @@ main() {
 
     log_info "Creating swap file at ${SWAP_FILE_PATH} with size ${SWAP_SIZE}..."
     # `fallocate` instantly reserves the space.
-    fallocate -l "${SWAP_SIZE}" "${SWAP_FILE_PATH}"
+    if ! fallocate -l "${SWAP_SIZE}" "${SWAP_FILE_PATH}"; then
+        log_error "Failed to allocate swap file space."
+        exit 1
+    fi
 
     log_info "Setting secure permissions for swap file..."
     # Only the root user should be able to read/write the swap file.
     chmod 600 "${SWAP_FILE_PATH}"
 
     log_info "Formatting file as swap space..."
-    mkswap "${SWAP_FILE_PATH}"
+    if ! mkswap "${SWAP_FILE_PATH}"; then
+        log_error "Failed to format swap file."
+        rm -f "${SWAP_FILE_PATH}"
+        exit 1
+    fi
 
     log_info "Enabling swap..."
-    swapon "${SWAP_FILE_PATH}"
+    if ! swapon "${SWAP_FILE_PATH}"; then
+        log_error "Failed to enable swap."
+        rm -f "${SWAP_FILE_PATH}"
+        exit 1
+    fi
 
     log_info "Adding swap file to /etc/fstab to make it permanent..."
+    # Backup /etc/fstab before modification
+    backup_file "/etc/fstab" "/tmp"
     # This ensures the swap file is activated on reboot.
     echo "${SWAP_FILE_PATH} none swap sw 0 0" >> /etc/fstab
 
@@ -62,9 +81,12 @@ main() {
     sysctl vm.swappiness="${SWAPPINESS_VALUE}"
     
     log_info "Making swappiness setting permanent..."
+    backup_file "/etc/sysctl.conf" "/tmp"
     echo "vm.swappiness=${SWAPPINESS_VALUE}" >> /etc/sysctl.conf
 
     log_success "Swap file configured successfully."
+    log_info "Verifying swap status..."
+    free -h || log_warn "Could not run free -h"
     log_info "----------------------------------------"
 }
 

@@ -26,34 +26,43 @@ prompt_for_details() {
 check_dns() {
     log_info "Performing DNS pre-flight check for ${DOMAIN}..."
     
-    # FIXED: Improve IP retrieval and validation
+    # Verify dig is available
+    ensure_command "dig" "Install: sudo apt-get install dnsutils"
+    
+    # Get public IP with timeout
+    log_debug "Retrieving public IP address..."
     local public_ip
-    public_ip=$(curl -s http://ifconfig.me/ip)
+    public_ip=$(timeout 5 curl -s http://ifconfig.me/ip 2>/dev/null || echo "")
     
     if [[ -z "${public_ip}" ]]; then
-        log_error "Could not determine public IP."
+        log_error "Could not determine public IP. Check network connectivity."
+        log_info "💡 Try running: curl http://ifconfig.me/ip"
         exit 1
     fi
+    
+    log_debug "Public IP: ${public_ip}"
 
-    # FIXED: Strictly filter for IPv4 and handle multiple records
+    # Strictly filter for IPv4 and handle multiple records
+    log_debug "Looking up DNS records for ${DOMAIN}..."
     local domain_ip
-    domain_ip=$(dig +short "${DOMAIN}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
+    domain_ip=$(timeout 5 dig +short "${DOMAIN}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
 
     if [[ -z "${domain_ip}" ]]; then
-        log_error "DNS record for ${DOMAIN} not found."
-        log_info "Please create an A record pointing to ${public_ip} and wait a few minutes."
+        log_error "DNS record for ${DOMAIN} not found or not yet propagated."
+        log_info "Please ensure an A record exists pointing to ${public_ip}"
+        log_info "💡 DuckDNS might take 5-10 minutes to propagate."
         exit 1
     fi
     
     if [[ "${public_ip}" != "${domain_ip}" ]]; then
-        log_error "DNS mismatch!"
+        log_error "DNS mismatch detected!"
         log_error "  - Your server's public IP: ${public_ip}"
-        log_error "  - ${DOMAIN} points to:   ${domain_ip}"
-        log_info "Please update your DNS A record and wait for it to propagate."
+        log_error "  - ${DOMAIN} resolves to:  ${domain_ip}"
+        log_info "Please update your DNS A record and wait for propagation (5-10 minutes)."
         exit 1
     fi
     
-    log_success "DNS check passed. ${DOMAIN} points to ${public_ip}."
+    log_success "DNS check passed. ${DOMAIN} correctly points to ${public_ip}."
 }
 
 # --- Main Logic ---
@@ -67,22 +76,41 @@ main() {
     if [[ -z "${DOMAIN}" || -z "${EMAIL}" ]]; then
         prompt_for_details
     else
-        log_info "Using domain and email from environment/arguments."
+        log_info "Using domain: ${DOMAIN}"
+        log_info "Using email: ${EMAIL}"
     fi
     
+    # Verify Nginx is running
+    if ! systemctl is-active --quiet nginx; then
+        log_error "Nginx is not running. Please install and start Nginx first."
+        exit 1
+    fi
+    
+    # Check/install Certbot
     if ! command -v certbot &> /dev/null; then
         log_info "Certbot is not installed. Installing now..."
         wait_for_apt
-        apt-get update -qq
-        apt-get install -y -qq certbot python3-certbot-nginx
-        log_success "Certbot installed."
+        if ! apt-get update -qq; then
+            log_error "Failed to update package lists."
+            exit 1
+        fi
+        if ! apt-get install -y -qq certbot python3-certbot-nginx; then
+            log_error "Failed to install Certbot."
+            exit 1
+        fi
+        log_success "Certbot installed successfully."
+    else
+        log_success "Certbot is already installed."
     fi
 
     local nginx_config="/etc/nginx/sites-available/${DOMAIN}"
     if [[ ! -f "${nginx_config}" ]]; then
         log_info "Creating Nginx server block for ${DOMAIN}..."
         
-        # FIXED: Added stub_status for Ops Agent metrics
+        # Backup default config before modification
+        backup_file "/etc/nginx/sites-available/default" "/tmp"
+        
+        # Added stub_status for Google Cloud Ops Agent metrics
         cat <<EOF > "${nginx_config}"
 server {
     listen 80;
@@ -104,15 +132,28 @@ server {
     }
 }
 EOF
-        ln -sf "${nginx_config}" "/etc/nginx/sites-enabled/"
+        log_debug "Nginx config created at: ${nginx_config}"
+        
+        # Enable site
+        if ln -sf "${nginx_config}" "/etc/nginx/sites-enabled/"; then
+            log_success "Site configuration symlinked to sites-enabled."
+        else
+            log_error "Failed to create symlink."
+            exit 1
+        fi
         
         if [[ -f "/etc/nginx/sites-enabled/default" ]]; then
             log_info "Disabling default Nginx config..."
-            rm "/etc/nginx/sites-enabled/default"
+            rm -f "/etc/nginx/sites-enabled/default"
         fi
 
-        log_info "Reloading Nginx..."
+        log_info "Testing and reloading Nginx configuration..."
+        if ! nginx -t; then
+            log_error "Nginx configuration test failed. Please review the config."
+            exit 1
+        fi
         systemctl reload nginx
+        log_success "Nginx reloaded successfully."
     else
         log_info "Nginx configuration for ${DOMAIN} already exists."
     fi
@@ -120,19 +161,22 @@ EOF
     check_dns
 
     log_info "Requesting SSL certificate for ${DOMAIN}..."
-    certbot --nginx \
+    log_info "⏳ This may take 1-2 minutes..."
+    
+    if certbot --nginx \
         -d "${DOMAIN}" \
         --non-interactive \
         --agree-tos \
         -m "${EMAIL}" \
         --redirect \
-        --expand
-
-    if [[ $? -eq 0 ]]; then
-        log_success "SSL Certificate installed and configured successfully!"
-        log_info "Your site is now available at: https://${DOMAIN}"
+        --expand; then
+        log_success "🔒 SSL Certificate installed and configured successfully!"
+        log_success "Your site is now available at: https://${DOMAIN}"
+        log_info "Certificate expires in 90 days. Renewal will happen automatically."
     else
         log_error "Certbot failed to obtain an SSL certificate."
+        log_info "💡 Review errors above and try: sudo certbot --nginx -d ${DOMAIN}"
+        exit 1
     fi
     
     log_info "----------------------------------------------------"

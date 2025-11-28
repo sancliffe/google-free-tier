@@ -19,6 +19,9 @@ main() {
     log_info "--- Phase 2: Installing Nginx ---"
     
     ensure_root
+    
+    # Check disk space
+    check_disk_space "/" 500  # Need ~500MB for Nginx
 
     # Check if Nginx is already installed
     #
@@ -32,27 +35,43 @@ main() {
         
         log_info "Updating package lists..."
         # -qq is quieter than -q
-        apt-get update -qq
+        if ! apt-get update -qq; then
+            log_error "Failed to update package lists."
+            exit 1
+        fi
 
         log_info "Installing Nginx..."
-        apt-get install -y -qq nginx
+        if ! apt-get install -y -qq nginx; then
+            log_error "Failed to install Nginx."
+            exit 1
+        fi
         log_success "Nginx installed successfully."
     fi
 
     log_info "Ensuring Nginx is enabled to start on boot..."
     # `systemctl enable` is idempotent. It will only create the link if it doesn't exist.
-    systemctl enable nginx
+    if ! systemctl enable nginx; then
+        log_error "Failed to enable Nginx to start on boot."
+        exit 1
+    fi
+
+    log_info "Starting Nginx service..."
+    if ! systemctl start nginx; then
+        log_error "Failed to start Nginx."
+        exit 1
+    fi
 
     # Verify that Nginx is active
     #
     # `systemctl is-active` returns a zero exit code if the service is running.
-    if systemctl is-active --quiet nginx; then
-        log_success "Nginx is running."
-    else
+    if ! systemctl is-active --quiet nginx; then
         log_error "Nginx is not running. Please check the service status."
         log_info "👉 Try running: sudo systemctl status nginx"
+        log_info "👉 Try running: sudo journalctl -u nginx -n 50"
         exit 1
     fi
+    
+    log_success "Nginx is running and configured to start on boot."
 
     log_info "-----------------------------------"
 }

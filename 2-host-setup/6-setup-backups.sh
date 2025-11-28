@@ -8,6 +8,7 @@ source "${SCRIPT_DIR}/common.sh"
 
 # --- Constants ---
 BACKUP_SCRIPT_PATH="/usr/local/bin/backup-to-gcs.sh"
+BACKUP_LOG_DIR="/var/log"
 
 # --- Main Logic ---
 main() {
@@ -17,80 +18,146 @@ main() {
     local BUCKET_NAME="${1:-${GCS_BUCKET_NAME}}"
     local BACKUP_DIR="${2:-${BACKUP_DIR}}"
 
+    # Validate inputs
     if [[ -z "${BUCKET_NAME}" ]]; then
         log_error "Bucket name is empty. Usage: $0 <GCS_BUCKET_NAME> <BACKUP_DIRECTORY>"
+        log_info "💡 You can also set GCS_BUCKET_NAME and BACKUP_DIR environment variables."
         exit 1
     fi
 
-    if [[ -z "${BACKUP_DIR}" || ! -d "${BACKUP_DIR}" ]]; then
-        log_error "Directory '${BACKUP_DIR}' does not exist or was not specified."
+    if [[ -z "${BACKUP_DIR}" ]]; then
+        log_error "Backup directory not specified."
         exit 1
     fi
 
+    if [[ ! -d "${BACKUP_DIR}" ]]; then
+        log_error "Directory '${BACKUP_DIR}' does not exist."
+        log_info "💡 Please create it first: mkdir -p ${BACKUP_DIR}"
+        exit 1
+    fi
+    
+    log_info "Backup source: ${BACKUP_DIR}"
+    log_info "Backup destination: gs://${BUCKET_NAME}/"
+
+    # Verify gsutil is available
     if ! command -v gsutil &> /dev/null; then
         log_warn "gsutil command not found. Installing Google Cloud SDK..."
-        apt-get update -qq
-        apt-get install -y -qq google-cloud-sdk
+        wait_for_apt
+        apt-get update -qq || {
+            log_error "Failed to update package lists."
+            exit 1
+        }
+        apt-get install -y -qq google-cloud-sdk || {
+            log_error "Failed to install Google Cloud SDK."
+            exit 1
+        }
         log_success "Google Cloud SDK installed."
+    else
+        log_success "gsutil is available."
     fi
 
     log_info "Creating backup script at ${BACKUP_SCRIPT_PATH}..."
     
-    cat <<EOF > "${BACKUP_SCRIPT_PATH}"
+    cat <<'EOF' > "${BACKUP_SCRIPT_PATH}"
 #!/bin/bash
 set -euo pipefail
 
-BUCKET_NAME="${BUCKET_NAME}"
-BACKUP_DIR="${BACKUP_DIR}"
-BACKUP_FILENAME="backup-\$(date -u +"%Y-%m-%d-%H%M%S").tar.gz"
-TEMP_FILE="/tmp/\${BACKUP_FILENAME}"
+# Configuration from environment or defaults
+BUCKET_NAME="${GCS_BUCKET_NAME:-}"
+BACKUP_DIR="${BACKUP_DIR:-}"
+BACKUP_FILENAME="backup-$(date -u +"%Y-%m-%d-%H%M%S").tar.gz"
+TEMP_FILE="/tmp/${BACKUP_FILENAME}"
 
-log() { echo "[\$(date -u +"%Y-%m-%dT%H:%M:%SZ")] \$1"; }
+log() { 
+    echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] $1" 
+    [[ -n "${BACKUP_LOG_FILE:-}" ]] && echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] $1" >> "${BACKUP_LOG_FILE}"
+}
 
-log "Creating archive of \${BACKUP_DIR}..."
-# FIXED: Archive validation
-if ! tar -czf "\${TEMP_FILE}" -C "\$(dirname "\${BACKUP_DIR}")" "\$(basename "\${BACKUP_DIR}")"; then
-    log "ERROR: Failed to create archive."
+error_exit() {
+    log "ERROR: $1"
+    [[ -f "${TEMP_FILE}" ]] && rm -f "${TEMP_FILE}"
     exit 1
+}
+
+log "=== Backup started ==="
+log "Source: ${BACKUP_DIR}"
+log "Destination: gs://${BUCKET_NAME}/"
+
+# Validate configuration
+[[ -z "${BUCKET_NAME}" ]] && error_exit "BUCKET_NAME not set"
+[[ -z "${BACKUP_DIR}" ]] && error_exit "BACKUP_DIR not set"
+[[ ! -d "${BACKUP_DIR}" ]] && error_exit "BACKUP_DIR does not exist: ${BACKUP_DIR}"
+
+log "Creating archive of ${BACKUP_DIR}..."
+if ! tar -czf "${TEMP_FILE}" -C "$(dirname "${BACKUP_DIR}")" "$(basename "${BACKUP_DIR}")" 2>/dev/null; then
+    error_exit "Failed to create archive"
 fi
 
-# Verify archive exists and has size
-if [[ ! -s "\${TEMP_FILE}" ]]; then
-    log "ERROR: Archive file is empty or missing."
-    rm -f "\${TEMP_FILE}"
-    exit 1
+# Verify archive exists and has content
+if [[ ! -s "${TEMP_FILE}" ]]; then
+    error_exit "Archive file is empty or missing"
 fi
 
-FILE_SIZE=\$(stat -c%s "\${TEMP_FILE}")
-log "Archive created successfully. Size: \${FILE_SIZE} bytes."
+FILE_SIZE=$(stat -c%s "${TEMP_FILE}" 2>/dev/null || stat -f%z "${TEMP_FILE}" 2>/dev/null || echo "unknown")
+log "Archive created successfully. Size: ${FILE_SIZE} bytes"
 
-log "Uploading \${BACKUP_FILENAME} to gs://\${BUCKET_NAME}..."
-if ! gsutil cp "\${TEMP_FILE}" "gs://\${BUCKET_NAME}/"; then
-    log "ERROR: Backup upload failed!"
-    rm -f "\${TEMP_FILE}"
-    exit 1
+log "Uploading ${BACKUP_FILENAME} to gs://${BUCKET_NAME}..."
+if ! gsutil -h "Content-Type:application/gzip" cp "${TEMP_FILE}" "gs://${BUCKET_NAME}/${BACKUP_FILENAME}"; then
+    error_exit "Backup upload failed"
 fi
 
-rm "\${TEMP_FILE}"
-log "Backup complete."
+log "Upload complete. Verifying..."
+if gsutil ls "gs://${BUCKET_NAME}/${BACKUP_FILENAME}" > /dev/null; then
+    log "✅ Backup verified successfully at gs://${BUCKET_NAME}/${BACKUP_FILENAME}"
+else
+    error_exit "Backup verification failed"
+fi
+
+# Cleanup local temp file
+rm -f "${TEMP_FILE}"
+
+log "=== Backup completed successfully ==="
 EOF
 
     chmod 700 "${BACKUP_SCRIPT_PATH}"
+    log_success "Backup script created at ${BACKUP_SCRIPT_PATH}"
+    
+    # Test the backup script
+    log_info "Testing backup script..."
+    if ! BACKUP_LOG_FILE="${BACKUP_LOG_DIR}/backup-test.log" \
+         GCS_BUCKET_NAME="${BUCKET_NAME}" \
+         BACKUP_DIR="${BACKUP_DIR}" \
+         "${BACKUP_SCRIPT_PATH}"; then
+        log_error "Backup test failed. Check gsutil authentication:"
+        log_info "  👉 Run: gcloud auth application-default login"
+        log_info "  👉 Or: gcloud config set project PROJECT_ID"
+        exit 1
+    fi
+    log_success "Backup test completed successfully!"
     
     log_info "Setting up cron job to run at 3 AM daily..."
-    local cron_log="/var/log/backup.log"
-    local cron_cmd="0 3 * * * ${BACKUP_SCRIPT_PATH} >> ${cron_log} 2>&1"
+    local cron_log="${BACKUP_LOG_DIR}/backup.log"
+    local cron_cmd="0 3 * * * BUCKET_NAME='${BUCKET_NAME}' BACKUP_DIR='${BACKUP_DIR}' BACKUP_LOG_FILE='${cron_log}' ${BACKUP_SCRIPT_PATH} >> ${cron_log} 2>&1"
+    
     local temp_cron
     temp_cron=$(mktemp)
-
-    # FIXED: Safer crontab handling
+    
+    # Safer crontab handling - preserve existing crons
     (crontab -l 2>/dev/null || true) | grep -vF "${BACKUP_SCRIPT_PATH}" > "${temp_cron}" || true
     echo "${cron_cmd}" >> "${temp_cron}"
 
-    crontab "${temp_cron}"
+    if crontab "${temp_cron}"; then
+        log_success "Cron job installed successfully."
+        log_info "Backup will run daily at 3 AM UTC"
+        log_info "Check logs: tail -f ${cron_log}"
+    else
+        log_error "Failed to install cron job."
+        rm "${temp_cron}"
+        exit 1
+    fi
+    
     rm "${temp_cron}"
-
-    log_success "Setup complete! Backup job added."
+    log_success "Setup complete! Automated backups configured."
 }
 
 main "$@"

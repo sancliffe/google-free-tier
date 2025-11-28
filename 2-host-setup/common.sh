@@ -98,3 +98,106 @@ wait_for_apt() {
         fi
     done
 }
+
+# --- Command Validation ---
+ensure_command() {
+    local cmd="$1"
+    local install_hint="${2:-}"
+    
+    if ! command -v "${cmd}" &> /dev/null; then
+        log_error "Required command '${cmd}' not found."
+        if [[ -n "${install_hint}" ]]; then
+            log_info "💡 Install hint: ${install_hint}"
+        fi
+        exit 1
+    fi
+    log_debug "Command '${cmd}' is available."
+}
+
+# --- Disk Space Checking ---
+check_disk_space() {
+    local target_path="${1:-.}"
+    local min_space_mb="${2:-100}"
+    
+    # Get available space in MB
+    local available_mb
+    available_mb=$(df "${target_path}" | awk 'NR==2 {print int($4)}')
+    
+    if [[ "${available_mb}" -lt "${min_space_mb}" ]]; then
+        log_error "Insufficient disk space in ${target_path}. Required: ${min_space_mb}MB, Available: ${available_mb}MB"
+        exit 1
+    fi
+    log_debug "Disk space check passed: ${available_mb}MB available (need ${min_space_mb}MB)"
+}
+
+# --- File Backup Function ---
+backup_file() {
+    local file="$1"
+    local backup_dir="${2:-.}"
+    
+    if [[ ! -f "${file}" ]]; then
+        log_warn "File '${file}' does not exist, skipping backup."
+        return 0
+    fi
+    
+    local backup_file="${backup_dir}/$(basename "${file}").bak.$(date -u +%s)"
+    cp "${file}" "${backup_file}"
+    log_success "Backed up '${file}' to '${backup_file}'"
+}
+
+# --- Service Wait Function ---
+wait_for_service() {
+    local service="$1"
+    local max_retries="${2:-30}"
+    local count=0
+    
+    log_info "Waiting for service '${service}' to be active..."
+    
+    while ! systemctl is-active --quiet "${service}"; do
+        count=$((count+1))
+        if [[ "$count" -ge "$max_retries" ]]; then
+            log_error "Service '${service}' did not become active within timeout."
+            return 1
+        fi
+        log_debug "Service '${service}' not ready yet (attempt ${count}/${max_retries})..."
+        sleep 1
+    done
+    
+    log_success "Service '${service}' is active."
+    return 0
+}
+
+# --- Version Comparison ---
+validate_version() {
+    local cmd="$1"
+    local min_version="${2:-}"
+    
+    if [[ -z "${min_version}" ]]; then
+        return 0
+    fi
+    
+    local current_version
+    current_version=$(${cmd} --version 2>&1 | head -1 | grep -oE '[0-9]+\.[0-9]+' | head -1)
+    
+    if [[ -z "${current_version}" ]]; then
+        log_warn "Could not parse version for '${cmd}'. Skipping version check."
+        return 0
+    fi
+    
+    log_debug "Version check for '${cmd}': current=${current_version}, minimum=${min_version}"
+}
+
+# --- Exit Trap Handler ---
+# Registers cleanup actions that run on exit or error
+on_error() {
+    local line_num=$1
+    log_error "Script error on line $line_num. Exit code: $?"
+}
+
+on_exit() {
+    # Can be overridden by individual scripts
+    :
+}
+
+trap "on_error \$LINENO" ERR
+trap "on_exit" EXIT
