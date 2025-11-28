@@ -3,7 +3,9 @@ kind: Deployment
 metadata:
   name: hello-gke-deployment
 spec:
-  # UPDATE: Reduced to 1 to fit within the GKE Autopilot Free Tier (750 hours/month)
+  # WARNING: While the GKE Autopilot *Management Fee* is waived for one cluster, 
+  # the compute resources (vCPU/RAM) defined below ARE BILLED. 
+  # GKE Autopilot is NOT part of the "Always Free" Compute Engine tier.
   replicas: 1 
   selector:
     matchLabels:
@@ -20,8 +22,8 @@ spec:
         - containerPort: 8080
       
         # --- GKE Autopilot Resource Requirements ---
-        # Explicit requests are required for Autopilot to calculate billing 
-        # and allocate the correct class of compute resources.
+        # Requests are minimized here, but still incur cost.
+        # Minimum for Autopilot is often 250m cpu / 512Mi memory.
         resources:
           requests:
             cpu: "250m"
@@ -34,7 +36,7 @@ spec:
         # Liveness: Restarts the container if it freezes or deadlocks.
         livenessProbe:
           httpGet:
-            path: /
+            path: /healthz
             port: 8080
           initialDelaySeconds: 15
           periodSeconds: 20
@@ -42,7 +44,7 @@ spec:
         # Readiness: Don't send traffic until this passes (e.g., during startup).
         readinessProbe:
           httpGet:
-            path: /
+            path: /healthz
             port: 8080
           initialDelaySeconds: 5
           periodSeconds: 10

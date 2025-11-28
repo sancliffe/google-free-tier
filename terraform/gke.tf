@@ -15,6 +15,10 @@ resource "google_container_cluster" "default" {
   enable_autopilot = true
   network          = "default"
   subnetwork       = "default"
+  
+  # Allow Terraform to destroy the cluster without manual intervention
+  deletion_protection = false
+
   depends_on = [
     google_project_service.gke_apis,
   ]

@@ -3,6 +3,11 @@ const express = require('express');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+// Health check endpoint (lightweight, for probes)
+app.get('/healthz', (req, res) => {
+  res.status(200).send('OK');
+});
+
 app.get('/', (req, res) => {
   res.send('Hello from Google Kubernetes Engine!');
 });

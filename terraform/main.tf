@@ -78,7 +78,8 @@ resource "google_compute_instance" "default" {
 
   tags = ["http-server", "https-server"]
 
-  metadata_startup_script = data.template_file.startup_script.rendered
+  # Use file() instead of deprecated template_file data source
+  metadata_startup_script = file("startup-script.sh.tpl")
 
   service_account {
     email  = google_service_account.vm_sa[0].email
@@ -89,10 +90,6 @@ resource "google_compute_instance" "default" {
   depends_on = [
     google_storage_bucket_object.setup_scripts
   ]
-}
-
-data "template_file" "startup_script" {
-  template = file("startup-script.sh.tpl")
 }
 
 # Creates a firewall rule to allow HTTP and HTTPS traffic from anywhere.
@@ -139,7 +136,6 @@ resource "google_storage_bucket" "backup_bucket" {
     enabled = true
   }
 
-  # --- UPDATE START ---
   # Automatically delete backups older than 7 days
   lifecycle_rule {
     condition {
@@ -149,10 +145,8 @@ resource "google_storage_bucket" "backup_bucket" {
       type = "Delete"
     }
   }
-  # --- UPDATE END ---
 }
 
-# --- UPDATE START ---
 # Allow full control of objects ONLY for this specific bucket
 resource "google_storage_bucket_iam_member" "vm_bucket_admin" {
   count  = var.enable_vm ? 1 : 0
@@ -160,7 +154,6 @@ resource "google_storage_bucket_iam_member" "vm_bucket_admin" {
   role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${google_service_account.vm_sa[0].email}"
 }
-# --- UPDATE END ---
 
 # Upload the local setup scripts to the GCS bucket
 resource "google_storage_bucket_object" "setup_scripts" {
