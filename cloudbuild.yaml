@@ -1,5 +1,9 @@
 steps:
-# 1. Build the Docker image
+# 1. Lint shell scripts
+- name: 'koalaman/shellcheck-alpine'
+  args: ['1-gcp-setup/*.sh', '2-host-setup/*.sh']
+
+# 2. Build the Docker image
 - name: 'gcr.io/cloud-builders/docker'
   args:
     - 'build'
