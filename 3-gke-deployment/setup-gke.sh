@@ -126,6 +126,7 @@ main() {
     terraform apply -auto-approve \
         -var="project_id=${project_id}" \
         -var="region=${region}" \
+        -var="artifact_registry_region=${region}" \
         -var="image_tag=${image_tag}" \
         -var="duckdns_token=${duckdns_token}" \
         -var="email_address=${email_address}" \

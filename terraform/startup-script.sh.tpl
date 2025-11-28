@@ -3,6 +3,10 @@
 # This startup script is executed when the VM boots up.
 set -e
 
+# --- Logging Setup ---
+# Redirect stdout and stderr to a log file and the serial console
+exec > >(tee /var/log/startup-script.log | logger -t startup-script -s 2>/dev/console) 2>&1
+
 # --- Run Once Logic ---
 # If this file exists, we assume setup has already run successfully.
 if [ -f /var/lib/google-free-tier-setup-complete ]; then
@@ -35,7 +39,8 @@ do
 done
 
 # Check if download actually succeeded before proceeding
-if [ ! -d "/tmp/2-host-setup" ] || [ -z "$(ls -A /tmp/2-host-setup)" ]; then
+if [ ! -d "/tmp/2-host-setup" ] || [ -z "$(ls -A /tmp/2-host-setup)" ];
+then
     echo "CRITICAL ERROR: Failed to download setup scripts. Aborting setup."
     exit 1
 fi
