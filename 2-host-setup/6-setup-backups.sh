@@ -42,7 +42,6 @@ main() {
 
     log_info "Creating backup script at ${BACKUP_SCRIPT_PATH}..."
     
-    # --- UPDATE START ---
     # Simplified script: Only handles creation and upload.
     # Cleanup is now handled by GCS Lifecycle policies managed by Terraform.
     cat <<EOF > "${BACKUP_SCRIPT_PATH}"
@@ -68,18 +67,26 @@ fi
 rm "\${TEMP_FILE}"
 log "Backup complete."
 EOF
-    # --- UPDATE END ---
 
     chmod 700 "${BACKUP_SCRIPT_PATH}"
+    
+    log_info "Setting up cron job to run at 3 AM daily..."
     local cron_log="/var/log/backup.log"
     local cron_cmd="0 3 * * * ${BACKUP_SCRIPT_PATH} >> ${cron_log} 2>&1"
+    local temp_cron
+    temp_cron=$(mktemp)
 
-    # --- UPDATE START ---
-    # Added '|| true' to crontab -l to prevent script failure if no crontab exists
-    (crontab -l 2>/dev/null || true | grep -vF "${BACKUP_SCRIPT_PATH}"; echo "${cron_cmd}") | crontab -
-    # --- UPDATE END ---
+    # 1. Get current crontab (if it exists)
+    # 2. Filter out any existing lines containing our script path (to prevent duplicates)
+    # 3. Append the new command
+    (crontab -l 2>/dev/null || true) | grep -vF "${BACKUP_SCRIPT_PATH}" > "${temp_cron}" || true
+    echo "${cron_cmd}" >> "${temp_cron}"
 
-    log_success "Setup complete!"
+    # Install the new crontab
+    crontab "${temp_cron}"
+    rm "${temp_cron}"
+
+    log_success "Setup complete! Backup job added."
 }
 
 main "$@"

@@ -25,13 +25,21 @@ export BACKUP_DIR=$(gcloud secrets versions access latest --secret="backup_dir")
 echo "Downloading setup scripts from gs://${GCS_BUCKET_NAME}/setup-scripts/..."
 mkdir -p /tmp/2-host-setup
 # Add retry logic for resilience
-for i in {1..5}; do
+for i in {1..5};
+do
   if gsutil cp -r "gs://${GCS_BUCKET_NAME}/setup-scripts/*" /tmp/2-host-setup/; then
     break
   fi
   echo "Download failed, retrying in 5s..."
   sleep 5
 done
+
+# Check if download actually succeeded before proceeding
+if [ ! -d "/tmp/2-host-setup" ] || [ -z "$(ls -A /tmp/2-host-setup)" ]; then
+    echo "CRITICAL ERROR: Failed to download setup scripts. Aborting setup."
+    exit 1
+fi
+
 chmod +x /tmp/2-host-setup/*.sh
 
 # 3. Run setup scripts

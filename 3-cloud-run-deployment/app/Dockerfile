@@ -1,5 +1,6 @@
 # Use an official Node.js runtime as a parent image
-FROM node:18-slim
+# Upgraded to 20-slim (Active LTS)
+FROM node:20-slim
 
 # Set the working directory in the container
 WORKDIR /usr/src/app
@@ -14,7 +15,6 @@ RUN npm ci --only=production
 # Bundle app source
 # Change ownership of the files to the 'node' user
 COPY --chown=node:node . .
-
 # Switch to the non-root 'node' user for security
 USER node
 

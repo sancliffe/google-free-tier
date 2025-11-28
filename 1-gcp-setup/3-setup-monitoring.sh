@@ -9,7 +9,6 @@ _log() {
     local level="$1"
     local color="$2"
     local message="$3"
-    # Unified ISO 8601 Timestamp
     local timestamp
     timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     
@@ -36,7 +35,6 @@ fi
 main() {
     log_info "--- GCP Monitoring Setup ---" 
     
-    # ... (Rest of the script remains identical, but now uses the new logging format) ...
     local project_id
     project_id=$(gcloud config get-value project)
     log_info "Operating in project: ${project_id}"
@@ -91,7 +89,7 @@ main() {
         --notification-channels="${channel_name}" \
         --condition-display-name="Uptime check failed on ${domain}" \
         --condition-filter="${filter}" \
-        --condition-duration=\"300s\" \
+        --condition-duration="300s" \
         --condition-trigger-count=1 \
         --condition-aggregator=count \
         --documentation="The uptime check for https://${domain} failed. The server may be down or misconfigured." \
