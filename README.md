@@ -919,7 +919,6 @@ We welcome contributions! Whether you're fixing bugs, improving documentation, a
 - **Setup Help:** Review the appropriate phase section below
 - **Security Questions:** See [SECURITY.md](SECURITY.md)
 - **Contributing:** See [CONTRIBUTING.md](CONTRIBUTING.md)
-- **Bash Scripts:** See [BASH_IMPROVEMENTS.md](BASH_IMPROVEMENTS.md)
 
 ### Community Support
 - **Issues & Bugs:** [GitHub Issues](https://github.com/BranchingBad/google-free-tier/issues)
