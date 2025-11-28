@@ -3,6 +3,7 @@ resource "google_project_service" "gke_apis" {
   for_each = var.enable_gke ? toset([
     "container.googleapis.com",
     "artifactregistry.googleapis.com",
+    "firestore.googleapis.com" # Added: Enable Firestore API
   ]) : []
   service = each.key
 }

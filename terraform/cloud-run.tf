@@ -3,7 +3,8 @@ resource "google_project_service" "cloud_run_apis" {
   for_each = var.enable_cloud_run ? toset([
     "run.googleapis.com",
     "artifactregistry.googleapis.com",
-    "domains.googleapis.com"
+    "domains.googleapis.com",
+    "firestore.googleapis.com" # Added: Enable Firestore API
   ]) : []
   service = each.key
 }
@@ -20,6 +21,14 @@ resource "google_project_iam_member" "ar_reader" {
   count   = var.enable_cloud_run ? 1 : 0
   project = var.project_id
   role    = "roles/artifactregistry.reader"
+  member  = "serviceAccount:${google_service_account.cloud_run_sa[0].email}"
+}
+
+# Added: Grant the Service Account permission to access Firestore (Datastore)
+resource "google_project_iam_member" "firestore_user" {
+  count   = var.enable_cloud_run ? 1 : 0
+  project = var.project_id
+  role    = "roles/datastore.user"
   member  = "serviceAccount:${google_service_account.cloud_run_sa[0].email}"
 }
 
@@ -41,6 +50,12 @@ resource "google_cloud_run_v2_service" "default" {
       env {
         name  = "APP_VERSION"
         value = var.image_tag
+      }
+      
+      # Inject Project ID for Firestore auto-discovery
+      env {
+        name  = "GOOGLE_CLOUD_PROJECT"
+        value = var.project_id
       }
 
       # IMPROVEMENT: Add Health Probes
