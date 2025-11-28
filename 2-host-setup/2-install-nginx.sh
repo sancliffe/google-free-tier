@@ -11,7 +11,8 @@
 # We use it to import our helper functions and settings from common.sh.
 # The `dirname "$0"` part ensures we find common.sh relative to this script's
 # location, regardless of where the script is called from.
-source "/tmp/2-host-setup/common.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/common.sh"
 
 # --- Main Logic ---
 main() {

@@ -5,7 +5,9 @@
 # This script opens ports for Nginx (HTTP & HTTPS) if the UFW firewall
 # is active on the VM.
 
-source "/tmp/2-host-setup/common.sh"
+# Resolve the directory where the script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/common.sh"
 
 main() {
     log_info "--- Phase 5: Adjusting Local Firewall (UFW) ---"

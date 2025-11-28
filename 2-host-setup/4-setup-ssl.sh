@@ -6,7 +6,9 @@
 # domain. It requires Nginx to be installed and the domain's DNS A record
 # to be pointing to this server's IP address.
 
-source "/tmp/2-host-setup/common.sh"
+# Resolve the directory where the script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/common.sh"
 
 # --- Function to prompt for user input ---
 prompt_for_details() {

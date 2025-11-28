@@ -2,7 +2,9 @@
 #
 # Phase 3: Set up DuckDNS for dynamic IP updates.
 
-source "/tmp/2-host-setup/common.sh"
+# Resolve the directory where the script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/common.sh"
 
 # --- Constants ---
 INSTALL_DIR="${HOME}/.duckdns"
