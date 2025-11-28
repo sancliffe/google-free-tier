@@ -3,6 +3,13 @@
 # This startup script is executed when the VM boots up.
 set -e
 
+# --- Run Once Logic ---
+# If this file exists, we assume setup has already run successfully.
+if [ -f /var/lib/google-free-tier-setup-complete ]; then
+    echo "Setup already complete. Skipping."
+    exit 0
+fi
+
 echo "--- Startup Script Initiated ---"
 
 # 1. Fetch secrets from Secret Manager
@@ -39,4 +46,6 @@ sudo -E /tmp/2-host-setup/6-setup-backups.sh
 sudo /tmp/2-host-setup/7-setup-security.sh
 sudo /tmp/2-host-setup/8-setup-ops-agent.sh
 
+# 4. Mark setup as complete
+touch /var/lib/google-free-tier-setup-complete
 echo "--- Startup Script Complete ---"
