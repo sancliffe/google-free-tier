@@ -22,4 +22,4 @@ jobs:
       with:
         context: ./app
         push: true
-        tags: ghcr.io/${{ github.repository_owner }}/google-free-tier:latest
+        tags: ghcr.io/${{ toLower(github.repository_owner) }}/google-free-tier:latest
