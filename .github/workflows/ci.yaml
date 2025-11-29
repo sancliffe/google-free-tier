@@ -14,3 +14,40 @@ jobs:
       - name: Terraform validate
         working-directory: terraform
         run: terraform init -backend=false && terraform validate
+
+  release:
+    name: Create GitHub Release
+    needs: [validate]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate SHA256 checksums for release assets
+        run: |
+          # Create dist directory and generate checksums for release artifacts
+          mkdir -p dist/
+          # Add files to dist if they exist (scripts, terraform configs, docker image info, etc.)
+          if [ -d "app/" ]; then cp -r app/ dist/; fi
+          if [ -d "terraform/" ]; then cp -r terraform/ dist/; fi
+          if [ -d "scripts/" ]; then cp -r scripts/ dist/; fi
+          if [ -f "README.md" ]; then cp README.md dist/; fi
+          # Generate checksums for all files in dist
+          cd dist && find . -type f ! -name "sha256sums.txt" -exec sha256sum {} \; > sha256sums.txt && cd ..
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: false
+          files: |
+            dist/sha256sums.txt
+            dist/README.md
+            dist/app/**/*
+            dist/terraform/**/*
+            dist/scripts/**/*
