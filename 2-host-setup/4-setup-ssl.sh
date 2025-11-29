@@ -161,9 +161,10 @@ EOF
     check_dns
 
     log_info "Requesting SSL certificate for ${DOMAIN}..."
-    log_info "⏳ This may take 1-2 minutes..."
+    log_info "⏳ This may take a few minutes..."
     
-    if certbot --nginx \
+    # Add a timeout to prevent the script from hanging indefinitely
+    if timeout 300 certbot --nginx \
         -d "${DOMAIN}" \
         --non-interactive \
         --agree-tos \

@@ -45,10 +45,18 @@ main() {
     fi
 
     log_info "Creating swap file at ${SWAP_FILE_PATH} with size ${SWAP_SIZE}..."
-    # `fallocate` instantly reserves the space.
-    if ! fallocate -l "${SWAP_SIZE}" "${SWAP_FILE_PATH}"; then
-        log_error "Failed to allocate swap file space."
-        exit 1
+    # Try using fallocate first for speed. If it fails, fall back to dd.
+    if fallocate -l "${SWAP_SIZE}" "${SWAP_FILE_PATH}"; then
+        log_info "Swap file allocated successfully with fallocate."
+    else
+        log_warn "fallocate failed. Falling back to dd, which is more compatible but slower."
+        # SWAP_SIZE is 2G, so we use a block size of 1G and a count of 2.
+        if ! dd if=/dev/zero of="${SWAP_FILE_PATH}" bs=1G count=2 status=progress; then
+            log_error "dd command failed to create swap file."
+            rm -f "${SWAP_FILE_PATH}" # Clean up partial file
+            exit 1
+        fi
+        log_success "Swap file created with dd."
     fi
 
     log_info "Setting secure permissions for swap file..."
