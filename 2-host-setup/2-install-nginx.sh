@@ -12,7 +12,7 @@
 # The `dirname "$0"` part ensures we find common.sh relative to this script's
 # location, regardless of where the script is called from.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=./common.sh
+# shellcheck source=2-host-setup/common.sh
 source "${SCRIPT_DIR}/common.sh"
 
 # --- Main Logic ---
