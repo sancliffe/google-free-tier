@@ -53,9 +53,9 @@ fi
 DOWNLOAD_MARKER="/var/lib/google-free-tier-scripts-downloaded"
 if [ ! -f "$DOWNLOAD_MARKER" ]; then
     DOWNLOAD_DIR="/tmp/2-host-setup"
-    TARBALL_PATH="${DOWNLOAD_DIR}/setup-scripts.tar.gz"
+    TARBALL_PATH="$${DOWNLOAD_DIR}/setup-scripts.tar.gz"
     REMOTE_TARBALL_PATH="gs://${gcs_bucket_name}/setup-scripts/setup-scripts.tar.gz"
-    SETUP_SCRIPTS_MD5="${setup_scripts_tarball_md5}" # Passed from Terraform
+    SETUP_SCRIPTS_MD5="$${setup_scripts_tarball_md5}" # Passed from Terraform
 
     echo "Attempting to download and verify setup scripts from GCS..."
     mkdir -p "$DOWNLOAD_DIR"
@@ -63,39 +63,39 @@ if [ ! -f "$DOWNLOAD_MARKER" ]; then
     # Check if tarball exists locally and matches MD5
     LOCAL_MD5=""
     if [ -f "$TARBALL_PATH" ]; then
-        LOCAL_MD5=$(md5sum "$TARBALL_PATH" | awk '{print $1}')
+        LOCAL_MD5=$$(md5sum "$TARBALL_PATH" | awk '{print $$1}')
     fi
 
     if [ "$LOCAL_MD5" == "$SETUP_SCRIPTS_MD5" ]; then
         echo "Local tarball is up to date (MD5 matches). Skipping download."
     else
-        echo "Downloading ${REMOTE_TARBALL_PATH}..."
+        echo "Downloading $${REMOTE_TARBALL_PATH}..."
         MAX_RETRIES=5
         for ((i=1; i<=MAX_RETRIES; i++)); do
             if gsutil cp "$REMOTE_TARBALL_PATH" "$TARBALL_PATH"; then
                 echo "Download successful."
-                LOCAL_MD5=$(md5sum "$TARBALL_PATH" | awk '{print $1}')
+                LOCAL_MD5=$$(md5sum "$TARBALL_PATH" | awk '{print $$1}')
                 if [ "$LOCAL_MD5" == "$SETUP_SCRIPTS_MD5" ]; then
                     echo "Checksum verified. MD5 matches."
                     break
                 else
-                    echo "Checksum mismatch! Local: $LOCAL_MD5, Remote: $SETUP_SCRIPTS_MD5 (Attempt $i/$MAX_RETRIES)"
+                    echo "Checksum mismatch! Local: $$LOCAL_MD5, Remote: $$SETUP_SCRIPTS_MD5 (Attempt $$i/$$MAX_RETRIES)"
                 fi
             fi
-            if [ $i -eq $MAX_RETRIES ]; then
-                echo "CRITICAL ERROR: Failed to download or verify setup scripts after $MAX_RETRIES attempts."
+            if [ $$i -eq $$MAX_RETRIES ]; then
+                echo "CRITICAL ERROR: Failed to download or verify setup scripts after $$MAX_RETRIES attempts."
                 exit 1
             fi
-            BACKOFF=$((2 ** i))
-            echo "Retrying in ${BACKOFF}s..."
-            sleep $BACKOFF
+            BACKOFF=$$(( 2 ** $$i ))
+            echo "Retrying in $${BACKOFF}s..."
+            sleep $$BACKOFF
         done
     fi
 
     # Extract scripts
-    echo "Extracting setup scripts to ${DOWNLOAD_DIR}..."
+    echo "Extracting setup scripts to $${DOWNLOAD_DIR}..."
     tar -xzf "$TARBALL_PATH" -C "$DOWNLOAD_DIR" --strip-components=1 # strip top-level directory
-    chmod +x "${DOWNLOAD_DIR}"/*.sh
+    chmod +x "$${DOWNLOAD_DIR}"/*.sh
     touch "$DOWNLOAD_MARKER"
 else
     echo "Setup scripts already downloaded. Skipping."
@@ -118,9 +118,9 @@ echo "Running setup scripts..."
     "8-setup-ops-agent.sh"
   )
 
-  for SCRIPT in "${SCRIPT_NAMES[@]}"; do
-    SCRIPT_MARKER="/var/lib/google-free-tier-${SCRIPT}-complete"
-    SCRIPT_FAILED_MARKER="/var/lib/google-free-tier-${SCRIPT}-failed"
+  for SCRIPT in "$${SCRIPT_NAMES[@]}"; do
+    SCRIPT_MARKER="/var/lib/google-free-tier-$${SCRIPT}-complete"
+    SCRIPT_FAILED_MARKER="/var/lib/google-free-tier-$${SCRIPT}-failed"
     
     if [ -f "$SCRIPT_FAILED_MARKER" ]; then
         echo "Previous run of $SCRIPT failed. Retrying..."
