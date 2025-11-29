@@ -32,7 +32,7 @@ check_dns() {
     # Get public IP with timeout
     log_debug "Retrieving public IP address..."
     local public_ip
-    public_ip=$(timeout 5 curl -s http://ifconfig.me/ip 2>/dev/null || echo "")
+    public_ip=$(timeout 10 curl -s http://ifconfig.me/ip 2>/dev/null || echo "")
     
     if [[ -z "${public_ip}" ]]; then
         log_error "Could not determine public IP. Check network connectivity."
@@ -45,7 +45,7 @@ check_dns() {
     # Strictly filter for IPv4 and handle multiple records
     log_debug "Looking up DNS records for ${DOMAIN}..."
     local domain_ip
-    domain_ip=$(timeout 5 dig +short "${DOMAIN}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
+    domain_ip=$(timeout 10 dig +short "${DOMAIN}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
 
     if [[ -z "${domain_ip}" ]]; then
         log_error "DNS record for ${DOMAIN} not found or not yet propagated."

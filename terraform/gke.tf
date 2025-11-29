@@ -24,6 +24,13 @@ resource "google_container_cluster" "default" {
   ]
 }
 
+resource "google_project_iam_member" "gke_firestore_user" {
+  count   = var.enable_gke ? 1 : 0
+  project = var.project_id
+  role    = "roles/datastore.user"
+  member  = "serviceAccount:${var.project_id}.svc.id.goog[default/default]"
+}
+
 data "google_client_config" "default" {}
 
 provider "kubernetes" {

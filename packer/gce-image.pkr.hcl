@@ -52,7 +52,7 @@ build {
   }
 
   provisioner "file" {
-    source      = "../2-host-setup"
+    source      = "${path.root}/../2-host-setup"
     destination = "/tmp"
   }
 

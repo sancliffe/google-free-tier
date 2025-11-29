@@ -5,6 +5,9 @@ on:
     branches: [ "main" ]
     paths:
       - 'app/**'
+      - 'terraform/**'
+      - '2-host-setup/**'
+      - 'cloudbuild.yaml'
 
 jobs:
   build:

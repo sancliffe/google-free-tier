@@ -23,6 +23,14 @@ gcp-credentials.json
 *.tfstate.backup
 *.tfvars
 .terraform.lock.hcl
+*.tfplan
+crash.log
+override.tf
+override.tf.json
+
+# Packer
+packer_cache/
+*.box
 
 # Python
 __pycache__/
@@ -30,6 +38,10 @@ __pycache__/
 venv/
 env/
 .env
+
+# Scripts
+*.log
+.env.local
 
 # OS
 .DS_Store

@@ -89,7 +89,7 @@ resource "google_project_iam_member" "cost_killer_sa_compute" {
   project    = var.project_id
   role       = "roles/compute.instanceAdmin.v1"
   member     = "serviceAccount:${var.project_id}@appspot.gserviceaccount.com"
-  depends_on = [google_app_engine_application.app]
+  depends_on = [google_app_engine_application.app[0]]
 }
 
 resource "google_cloudfunctions_function" "cost_killer" {

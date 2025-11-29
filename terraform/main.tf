@@ -27,15 +27,10 @@ resource "google_project_service" "firestore" {
   disable_on_destroy = false
 }
 
-# Create Firestore database (Native mode)
-resource "google_firestore_database" "database" {
-  count       = (var.enable_cloud_run || var.enable_gke) ? 1 : 0
-  project     = var.project_id
-  name        = "(default)"
-  location_id = "nam5"
-  type        = "FIRESTORE_NATIVE"
-
-  depends_on = [google_project_service.firestore]
+# Data source to check for existing Firestore database
+data "google_firestore_database" "database" {
+  project  = var.project_id
+  database = "(default)"
 }
 
 # --- Service Account & IAM ---

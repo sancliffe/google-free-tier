@@ -8,9 +8,15 @@ const ASSETS_URL = process.env.ASSETS_URL || '';
 // Initialize Firestore
 const firestore = new Firestore();
 
-// Health check endpoint (lightweight, for probes)
-app.get('/healthz', (req, res) => {
-  res.status(200).send('OK');
+// Add health check for Firestore
+app.get('/healthz', async (req, res) => {
+  try {
+    await firestore.collection('_health').limit(1).get();
+    res.status(200).send('OK');
+  } catch (err) {
+    console.error('Health check failed:', err);
+    res.status(503).send('Service Unavailable');
+  }
 });
 
 app.get('/', async (req, res) => {

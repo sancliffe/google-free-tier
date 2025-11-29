@@ -22,3 +22,10 @@ This directory contains the Terraform configuration to create the GCS bucket use
    ```
 
 Once this is complete, you will have a GCS bucket named `<project_id>-tfstate`. This bucket will be used to store the state of your main infrastructure.
+
+## Cleanup Warning
+The Terraform state bucket has `prevent_destroy = true`. 
+To delete it:
+1. Remove lifecycle block from `bootstrap/main.tf`
+2. Run `terraform destroy` in bootstrap directory
+3. Manually delete bucket: `gsutil rm -r gs://PROJECT_ID-tfstate`
