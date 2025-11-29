@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - 'app/Dockerfile'
+      - 'app/**'
 
 jobs:
   build:
@@ -17,12 +17,9 @@ jobs:
         registry: ghcr.io
         username: ${{ github.repository_owner }}
         password: ${{ secrets.GITHUB_TOKEN }}
-    - name: Set owner to lowercase
-      id: strings
-      run: echo "owner_lc=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
     - name: Build and push
       uses: docker/build-push-action@v4
       with:
         context: ./app
         push: true
-        tags: ghcr.io/${{ steps.strings.outputs.owner_lc }}/google-free-tier:latest
+        tags: ghcr.io/${{ tolower(github.repository_owner) }}/google-free-tier:latest
