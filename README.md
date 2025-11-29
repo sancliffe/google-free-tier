@@ -714,6 +714,16 @@ The `cloudbuild.yaml` file defines an automated pipeline:
 3. **Build** - Creates Docker images for Cloud Run and GKE
 4. **Deploy** - Applies Terraform changes automatically
 
+#### Docker Image Build Process
+
+The Docker image, defined in `app/Dockerfile`, is built with a strong focus on security, reproducibility, and minimal size. Key features of the build process include:
+
+-   **Slim Base Image**: Uses `node:20-slim` as the base to reduce the image size and potential attack surface.
+-   **Reproducible Builds**: `npm ci --only=production` is used to install dependencies, ensuring that the exact versions from `package-lock.json` are used every time.
+-   **Non-Root User**: The application is run as a non-root `node` user to limit the container's privileges and enhance security.
+-   **Proper Process Management**: `dumb-init` is used as the entrypoint to correctly handle signals and reap orphaned child processes, preventing zombie processes.
+-   **Automated Tagging**: In the Cloud Build pipeline, the Docker image is automatically tagged with the short git commit SHA (`_SHORT_SHA`), ensuring that every deployment is traceable to a specific version of the code.
+
 **Setup Cloud Build trigger:**
 
 ```bash
