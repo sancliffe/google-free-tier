@@ -430,11 +430,11 @@ If you have questions about this Code of Conduct:
 
 | Date | Change | Version |
 |------|--------|---------|
-| 2025-11-28 | Initial Code of Conduct | 1.0 |
+| 2025-11-29 | Initial Code of Conduct | 1.0 |
 
 ---
 
-**Last Updated:** November 28, 2025  
+**Last Updated:** November 29, 2025  
 **Version:** 1.0  
 **Based on:** Contributor Covenant v2.1
 

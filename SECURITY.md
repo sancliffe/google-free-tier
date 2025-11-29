@@ -439,7 +439,7 @@ Security is a shared responsibility. If you discover a vulnerability or have sec
 
 | Date | Update | Severity |
 |------|--------|----------|
-| 2025-11-28 | Initial security policy | - |
+| 2025-11-29 | Initial security policy | - |
 
 ---
 
@@ -449,5 +449,5 @@ This security policy is part of the google-free-tier project and is available un
 
 ---
 
-**Last Updated:** November 28, 2025  
+**Last Updated:** November 29, 2025  
 **Version:** 1.0

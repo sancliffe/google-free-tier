@@ -221,7 +221,7 @@ The containerized applications (Cloud Run, GKE) use Firestore to persist data.
 gcloud firestore databases create --location=nam5 --type=firestore-native
 ```
 
-**Note on Terraform:** If you run the full Terraform configuration (Phase 5), it will attempt to create this database. If you have already created it manually, you should set `enable_firestore_database = false` in your `terraform.tfvars` file to prevent Terraform from attempting to create an already existing database. This will avoid deployment conflicts.
+**Note on Terraform:** If you run the full Terraform configuration (Phase 5), it will attempt to create this database. If you have manually created it in Phase 1, Step 6, you should set `enable_firestore_database = false` in your `terraform.tfvars` file to prevent Terraform from attempting to create an already existing database. This will avoid deployment conflicts.
 
 **Why Native Mode?**
 -   Required for real-time listeners used in modern web applications.
@@ -1043,18 +1043,8 @@ This project is open source and available under the [MIT License](LICENSE).
 
 ---
 
-**Last Updated:** November 28, 2025  
+**Last Updated:** November 29, 2025  
 **Latest Release:** [v2.0.0](https://github.com/BranchingBad/google-free-tier/releases/tag/v2.0.0)
-
----
-
-## 🙏 Acknowledgments
-
-- **Google Cloud Platform** - For the generous free tier
-- **Let's Encrypt** - For free SSL certificates
-- **DuckDNS** - For free dynamic DNS services
-- **Open Source Community** - For Nginx, Terraform, Kubernetes, and the tools that power this project
-- **Our Contributors** - Thank you for improving this project!
 
 ---
 

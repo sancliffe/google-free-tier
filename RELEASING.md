@@ -428,8 +428,8 @@ v X.Y.Z Released! ✓
 
 | Version | Release Date | Status |
 |---------|--------------|--------|
-| 2.0.0 | TBD | Planning |
-| 1.1.0 | 2025-11-28 | Latest |
+| 2.0.0 | 2025-11-29 | Latest |
+| 1.1.0 | 2025-11-29 | Stable |
 | 1.0.0 | 2025-11-01 | Stable |
 
 ---
@@ -609,5 +609,5 @@ jobs:
 
 ---
 
-**Last Updated:** November 28, 2025  
+**Last Updated:** November 29, 2025  
 **Version:** 1.0
