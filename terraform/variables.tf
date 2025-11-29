@@ -81,11 +81,6 @@ variable "enable_cloud_run_domain_mapping" {
   description = "Map the custom domain to Cloud Run. WARNING: Causes conflict if VM is also enabled with the same domain."
   type        = bool
   default     = false
-
-  validation {
-    condition     = !(var.enable_vm && var.enable_cloud_run_domain_mapping)
-    error_message = "Cannot enable both VM and Cloud Run domain mapping on the same domain."
-  }
 }
 
 variable "enable_firestore_database" {

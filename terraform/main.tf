@@ -12,6 +12,10 @@ terraform {
       source  = "gavinbunney/kubectl"
       version = ">= 1.7.0"
     }
+    null = {
+      source  = "hashicorp/null"
+      version = ">= 3.0.0"
+    }
   }
 }
 
@@ -19,6 +23,16 @@ provider "google" {
   project = var.project_id
   region  = var.region
   zone    = var.zone
+}
+
+# Validate that VM and Cloud Run domain mapping are not both enabled
+resource "null_resource" "validate_config" {
+  lifecycle {
+    precondition {
+      condition     = !(var.enable_vm && var.enable_cloud_run_domain_mapping)
+      error_message = "Cannot enable both VM and Cloud Run domain mapping on the same domain. Please set only one to true."
+    }
+  }
 }
 
 locals {
