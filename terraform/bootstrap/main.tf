@@ -36,9 +36,9 @@ resource "google_kms_crypto_key" "terraform_state_bucket" {
 }
 
 resource "google_storage_bucket" "tfstate" {
-  name          = "${var.project_id}-tfstate"
-  location      = "US" # Multi-regional for high availability
-  force_destroy = false
+  name                        = "${var.project_id}-tfstate"
+  location                    = "US" # Multi-regional for high availability
+  force_destroy               = false
   uniform_bucket_level_access = true
 
   versioning {
@@ -63,9 +63,9 @@ resource "google_storage_bucket" "tfstate" {
 }
 
 resource "google_storage_bucket" "tfstate_logs" {
-  name          = "${var.project_id}-tfstate-logs"
-  location      = "US"
-  force_destroy = false
+  name                        = "${var.project_id}-tfstate-logs"
+  location                    = "US"
+  force_destroy               = false
   uniform_bucket_level_access = true
 
   lifecycle {

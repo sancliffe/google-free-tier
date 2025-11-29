@@ -3,7 +3,7 @@ terraform {
   #   bucket = "<YOUR_PROJECT_ID>-tfstate"
   #   prefix = "terraform/state"
   # }
-  
+
   # Add validation
   required_version = ">= 1.3.0"
 }

@@ -43,13 +43,13 @@ resource "google_cloud_run_v2_service" "default" {
 
     containers {
       image = "${var.artifact_registry_region}-docker.pkg.dev/${var.project_id}/gke-apps/hello-app:${var.image_tag}"
-      
+
       # Inject the version/tag as an environment variable
       env {
         name  = "APP_VERSION"
         value = var.image_tag
       }
-      
+
       # Inject Project ID for Firestore auto-discovery
       env {
         name  = "GOOGLE_CLOUD_PROJECT"
@@ -85,8 +85,8 @@ resource "google_cloud_run_v2_service" "default" {
   }
 
   traffic {
-    percent         = 100
-    type            = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
+    percent = 100
+    type    = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
   }
 
   depends_on = [

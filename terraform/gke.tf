@@ -59,8 +59,8 @@ locals {
 }
 
 resource "kubectl_manifest" "gke_deployment" {
-  count      = var.enable_gke ? 1 : 0
-  yaml_body  = local.deployment_yaml
+  count     = var.enable_gke ? 1 : 0
+  yaml_body = local.deployment_yaml
   depends_on = [
     google_container_cluster.default,
   ]
@@ -72,16 +72,16 @@ resource "google_compute_global_address" "gke_static_ip" {
 }
 
 resource "kubectl_manifest" "gke_service" {
-  count      = var.enable_gke ? 1 : 0
-  yaml_body  = file("${path.module}/../3-gke-deployment/kubernetes/service.yaml")
+  count     = var.enable_gke ? 1 : 0
+  yaml_body = file("${path.module}/../3-gke-deployment/kubernetes/service.yaml")
   depends_on = [
     kubectl_manifest.gke_deployment,
   ]
 }
 
 resource "kubectl_manifest" "managed_certificate" {
-  count      = var.enable_gke ? 1 : 0
-  yaml_body  = templatefile("${path.module}/../3-gke-deployment/kubernetes/managed-certificate.yaml.tpl", {
+  count = var.enable_gke ? 1 : 0
+  yaml_body = templatefile("${path.module}/../3-gke-deployment/kubernetes/managed-certificate.yaml.tpl", {
     domain_name = var.domain_name
   })
   depends_on = [
@@ -90,8 +90,8 @@ resource "kubectl_manifest" "managed_certificate" {
 }
 
 resource "kubectl_manifest" "ingress" {
-  count      = var.enable_gke ? 1 : 0
-  yaml_body  = file("${path.module}/../3-gke-deployment/kubernetes/ingress.yaml")
+  count     = var.enable_gke ? 1 : 0
+  yaml_body = file("${path.module}/../3-gke-deployment/kubernetes/ingress.yaml")
   depends_on = [
     kubectl_manifest.gke_service,
   ]

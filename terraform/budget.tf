@@ -97,8 +97,8 @@ resource "google_project_iam_member" "cost_killer_sa_compute" {
 # should implement exponential backoff when calling GCP APIs that rely on
 # these permissions.
 resource "time_sleep" "wait_for_iam" {
-  count = var.enable_vm ? 1 : 0
-  depends_on = [google_project_iam_member.cost_killer_sa_compute]
+  count           = var.enable_vm ? 1 : 0
+  depends_on      = [google_project_iam_member.cost_killer_sa_compute]
   create_duration = "60s"
 }
 
@@ -200,7 +200,7 @@ resource "google_cloud_scheduler_job" "backup_check" {
     http_method = "GET" # Cloud Scheduler makes a GET request to HTTP triggered functions
     uri         = google_cloudfunctions_function.backup_monitor[0].https_trigger_url
   }
-  
+
   # Ensure the Cloud Function and its HTTP trigger URL are available
   depends_on = [google_cloudfunctions_function.backup_monitor]
 }
@@ -232,7 +232,7 @@ EOT
   }
 
   documentation {
-    content = "The daily backup check failed or reported an overdue backup. Please investigate the 'backup-monitor' Cloud Function logs."
+    content   = "The daily backup check failed or reported an overdue backup. Please investigate the 'backup-monitor' Cloud Function logs."
     mime_type = "text/markdown"
   }
 

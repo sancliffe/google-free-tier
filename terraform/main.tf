@@ -37,7 +37,7 @@ resource "null_resource" "validate_config" {
 
 locals {
   environment = terraform.workspace
-  
+
   # Environment-specific overrides
   config = {
     dev = {
@@ -130,11 +130,11 @@ resource "google_compute_instance" "default" {
   tags = ["http-server", "https-server"]
 
   metadata_startup_script = templatefile("${path.module}/startup-script.sh.tpl", {
-    gcs_bucket_name         = google_storage_bucket.backup_bucket[0].name
+    gcs_bucket_name = google_storage_bucket.backup_bucket[0].name
   })
 
   service_account {
-    email  = google_service_account.vm_sa[0].email
+    email = google_service_account.vm_sa[0].email
     scopes = [
       "https://www.googleapis.com/auth/logging.write",
       "https://www.googleapis.com/auth/monitoring.write",
@@ -181,7 +181,7 @@ resource "google_compute_firewall" "allow_ssh_iap" {
 resource "google_compute_health_check" "vm_health" {
   count = var.enable_vm ? 1 : 0
   name  = "vm-health-check"
-  
+
   tcp_health_check {
     port = "80"
   }
@@ -296,10 +296,10 @@ resource "google_monitoring_notification_channel" "email" {
 }
 
 resource "google_monitoring_uptime_check_config" "http" {
-  count           = var.enable_vm ? 1 : 0
-  display_name    = "Uptime check for ${var.domain_name}"
-  timeout         = "10s"
-  period          = "60s"
+  count        = var.enable_vm ? 1 : 0
+  display_name = "Uptime check for ${var.domain_name}"
+  timeout      = "10s"
+  period       = "60s"
   http_check {
     path    = "/"
     port    = "443"

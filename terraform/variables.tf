@@ -7,7 +7,7 @@ variable "duckdns_token" {
 variable "email_address" {
   description = "The email address for SSL certificate renewal notices."
   type        = string
-  
+
   validation {
     condition     = can(regex("^[^@]+@[^@]+\\.[^@]+$", var.email_address))
     error_message = "Must be a valid email address."
@@ -17,7 +17,7 @@ variable "email_address" {
 variable "domain_name" {
   description = "The domain name (e.g., my.duckdns.org)."
   type        = string
-  
+
   validation {
     condition     = can(regex("^[a-z0-9.-]+\\.[a-z]{2,}$", var.domain_name))
     error_message = "Domain name must be a valid FQDN."
@@ -157,7 +157,7 @@ variable "budget_amount" {
   description = "The amount to set the budget alert at."
   type        = string
   default     = "1"
-  
+
   validation {
     condition     = can(tonumber(var.budget_amount)) && tonumber(var.budget_amount) > 0
     error_message = "Budget amount must be a positive number."
