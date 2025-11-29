@@ -6,22 +6,6 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 
-# --- Function to prompt for user input ---
-prompt_for_details() {
-    while [[ -z "${DOMAIN:-}" ]]; do
-        read -p "Enter your full domain name (e.g., my.duckdns.org): " DOMAIN
-        if [[ -z "${DOMAIN}" ]]; then log_error "Domain cannot be empty."; fi
-    done
-    
-    while [[ -z "${EMAIL:-}" ]]; do
-        read -p "Enter your email (for renewal notices): " EMAIL
-        if ! [[ "${EMAIL}" =~ ^[^@]+@[^@]+\.[^@]+$ ]]; then
-            log_error "Please enter a valid email address."
-            EMAIL=""
-        fi
-    done
-}
-
 # --- DNS Pre-flight Check ---
 check_dns() {
     log_info "Performing DNS pre-flight check for ${DOMAIN}..."

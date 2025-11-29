@@ -94,7 +94,9 @@ resource "google_cloud_run_v2_service" "default" {
     google_project_service.cloud_run_apis["artifactregistry.googleapis.com"],
     google_project_service.cloud_run_apis["domains.googleapis.com"],
     google_project_iam_member.ar_reader,
-    google_storage_bucket.assets_bucket
+    google_storage_bucket.assets_bucket,
+    google_project_service.firestore,
+    data.google_firestore_database.database
   ]
 }
 

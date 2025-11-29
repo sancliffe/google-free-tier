@@ -49,6 +49,10 @@ resource "google_storage_bucket" "tfstate" {
     default_kms_key_name = google_kms_crypto_key.terraform_state_bucket.id
   }
 
+  logging {
+    destination = google_storage_bucket.tfstate_logs.name
+  }
+
   lifecycle {
     prevent_destroy = true
   }
@@ -56,4 +60,15 @@ resource "google_storage_bucket" "tfstate" {
   depends_on = [
     google_kms_crypto_key.terraform_state_bucket
   ]
+}
+
+resource "google_storage_bucket" "tfstate_logs" {
+  name          = "${var.project_id}-tfstate-logs"
+  location      = "US"
+  force_destroy = false
+  uniform_bucket_level_access = true
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }

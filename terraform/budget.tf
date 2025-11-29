@@ -92,6 +92,10 @@ resource "google_project_iam_member" "cost_killer_sa_compute" {
   depends_on = [google_app_engine_application.app[0]]
 }
 
+# This time_sleep is a workaround for IAM propagation delays.
+# A fixed sleep is fragile; ideally, the consuming Cloud Function (cost-killer)
+# should implement exponential backoff when calling GCP APIs that rely on
+# these permissions.
 resource "time_sleep" "wait_for_iam" {
   count = var.enable_vm ? 1 : 0
   depends_on = [google_project_iam_member.cost_killer_sa_compute]
@@ -184,5 +188,57 @@ resource "google_cloudfunctions_function" "backup_monitor" {
     google_storage_bucket.backup_bucket, # Ensure backup bucket exists
     google_project_iam_member.backup_monitor_viewer,
     google_project_iam_member.backup_monitor_logger
+  ]
+}
+
+resource "google_cloud_scheduler_job" "backup_check" {
+  count    = var.enable_vm ? 1 : 0 # Only create if VM is enabled and thus backups are relevant
+  name     = "backup-monitor-daily"
+  schedule = "0 4 * * *" # 4 AM daily
+
+  http_target {
+    http_method = "GET" # Cloud Scheduler makes a GET request to HTTP triggered functions
+    uri         = google_cloudfunctions_function.backup_monitor[0].https_trigger_url
+  }
+  
+  # Ensure the Cloud Function and its HTTP trigger URL are available
+  depends_on = [google_cloudfunctions_function.backup_monitor]
+}
+
+# --- Alert for Backup Failures ---
+resource "google_project_service" "monitoring_api" {
+  service            = "monitoring.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_monitoring_alert_policy" "backup_failed_alert" {
+  count        = var.enable_vm ? 1 : 0
+  display_name = "Backup Monitor Failure Alert"
+  combiner     = "OR"
+  notification_channels = [
+    google_monitoring_notification_channel.email[0].name,
+  ]
+
+  conditions {
+    display_name = "Backup check reported overdue"
+    condition_matched_log {
+      filter = <<EOT
+resource.type="cloud_function"
+resource.labels.function_name="backup-monitor"
+severity=ERROR
+textPayload:"Backup is overdue!"
+EOT
+    }
+  }
+
+  documentation {
+    content = "The daily backup check failed or reported an overdue backup. Please investigate the 'backup-monitor' Cloud Function logs."
+    mime_type = "text/markdown"
+  }
+
+  depends_on = [
+    google_project_service.monitoring_api,
+    google_cloudfunctions_function.backup_monitor,
+    google_monitoring_notification_channel.email # Ensure notification channel is available
   ]
 }

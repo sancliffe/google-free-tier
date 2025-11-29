@@ -15,18 +15,18 @@ main() {
     log_info "--- Phase 6: Setting up Automated Backups ---"
     ensure_root || exit 1
 
-    local BUCKET_NAME="${1:-${GCS_BUCKET_NAME}}"
-    local BACKUP_DIR="${2:-${BACKUP_DIR}}"
+    local CREDENTIALS_DIR="/root/.credentials"
+    local BUCKET_NAME="$(cat ${CREDENTIALS_DIR}/gcs_bucket_name)"
+    local BACKUP_DIR="$(cat ${CREDENTIALS_DIR}/backup_dir)"
 
     # Validate inputs
     if [[ -z "${BUCKET_NAME}" ]]; then
-        log_error "Bucket name is empty. Usage: $0 <GCS_BUCKET_NAME> <BACKUP_DIRECTORY>"
-        log_info "💡 You can also set GCS_BUCKET_NAME and BACKUP_DIR environment variables."
+        log_error "Bucket name is empty. Ensure 'gcs_bucket_name' is set in Secret Manager and startup script ran successfully."
         exit 1
     fi
 
     if [[ -z "${BACKUP_DIR}" ]]; then
-        log_error "Backup directory not specified."
+        log_error "Backup directory not specified. Ensure 'backup_dir' is set in Secret Manager and startup script ran successfully."
         exit 1
     fi
 

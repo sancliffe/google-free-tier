@@ -6,6 +6,8 @@ Setup and configure a web server on a Google Cloud Free Tier `e2-micro` VM, or d
 
 **New in v2.0:** The containerized applications now feature a persistent **Visitor Counter** backed by **Google Cloud Firestore**, demonstrating stateful serverless deployments!
 
+
+
 ## 🎯 Deployment Options
 
 Choose your preferred deployment path:
@@ -65,6 +67,7 @@ Before starting, ensure you have the following installed on your **local machine
 - 1GB = ~200-1000 page views depending on content
 - Exceeding this limit will incur charges (~$0.12/GB)
 - **Cloud Functions:** Invocations beyond free tier limits (used by the Cost Killer function)
+- **External IP Addresses:** While an external IP for a running `e2-micro` VM is often free, a static external IP address *retained* for a *stopped* VM instance will incur charges. **Always release unused static external IP addresses to prevent unexpected costs.**
 
 **Cost Optimization Tips:**
 - Enable billing alerts and budgets in GCP Console (covered in Phase 1, Step 3)
@@ -125,15 +128,18 @@ Run these commands from your **local machine** to prepare your GCP environment.
 - us-central1 (Iowa) ✅ Used by default
 - us-east1 (South Carolina)
 
-Using any other region will incur charges!
+**Important:** The free tier for the e2-micro VM is calculated based on **combined usage across all three regions**. Exceeding free tier limits in any or all of these regions combined will incur charges. Using any other region will also incur charges!
 
 Creates an `e2-micro` instance running Debian 12.
 
 ```bash
+# Set your values
+ZONE="us-central1-a" # Default free tier zone
+
 # See 1-gcp-setup/1-create-vm.txt for the full command
 gcloud compute instances create free-tier-vm \
   --machine-type=e2-micro \
-  --zone=us-central1-a \
+  --zone="${ZONE}" \
   --image-family=debian-12 \
   --image-project=debian-cloud \
   --boot-disk-size=30GB \
@@ -153,10 +159,13 @@ gcloud compute instances list
 Allows HTTP and HTTPS traffic to the VM.
 
 ```bash
+# Set your values
+ZONE="us-central1-a" # Default free tier zone
+
 # See 1-gcp-setup/2-open-firewall.txt
 gcloud compute instances add-tags free-tier-vm \
   --tags=http-server,https-server \
-  --zone=us-central1-a
+  --zone="${ZONE}"
 ```
 
 **Validation:** Check that firewall rules are applied:
@@ -211,26 +220,7 @@ This creates a Docker repository named `gke-apps` in Artifact Registry where you
 gcloud artifacts repositories list --location=us-central1
 ```
 
-### 6. Create Firestore Database (Native Mode)
 
-The containerized applications (Cloud Run, GKE) use Firestore to persist data.
-
-**Important:** Choose **Native Mode**, not Datastore Mode. This decision is permanent for the project.
-
-```bash
-gcloud firestore databases create --location=nam5 --type=firestore-native
-```
-
-**Note on Terraform:** If you run the full Terraform configuration (Phase 5), it will attempt to create this database. If you have manually created it in Phase 1, Step 6, you should set `enable_firestore_database = false` in your `terraform.tfvars` file to prevent Terraform from attempting to create an already existing database. This will avoid deployment conflicts.
-
-**Why Native Mode?**
--   Required for real-time listeners used in modern web applications.
--   Offers a more feature-rich and flexible data model compared to Datastore mode.
--   The choice between Native and Datastore mode **cannot be changed** after it is made.
-
-**Note:** `nam5` is the multi-region for North America. Choose a location that is close to your users. You can only have one Firestore database per project.
-
----
 
 ## Phase 2: ⚙️ Host VM Setup (Manual)
 
@@ -348,6 +338,36 @@ gsutil mb gs://your-backup-bucket-name
 sudo crontab -l | grep backup
 ```
 
+### Test Backup Restoration (Recommended Quarterly)
+
+It is crucial to regularly test your backup restoration process to ensure data integrity and a smooth recovery in case of a disaster.
+
+```bash
+# First, you need to get the latest backup file from your GCS bucket.
+# Replace BUCKET with your actual GCS backup bucket name.
+# You can find the exact backup filename by listing the bucket:
+# gsutil ls gs://YOUR_BACKUP_BUCKET/
+
+# Set your values
+YOUR_BACKUP_BUCKET="your-backup-bucket-name" # Replace with your actual GCS backup bucket name
+
+# Example: Copy the latest backup (adjust filename as needed)
+gsutil cp gs://"${YOUR_BACKUP_BUCKET}"/backup-YYYY-MM-DD-HHMMSS.tar.gz /tmp/
+
+# Create a temporary directory to restore into
+mkdir -p /tmp/restore-test/
+
+# Extract the backup
+tar -xzf /tmp/backup-YYYY-MM-DD-HHMMSS.tar.gz -C /tmp/restore-test/
+
+# Verify contents (e.g., list files, check important data)
+ls -la /tmp/restore-test/your-backup-directory-name/
+
+# Clean up temporary files
+rm /tmp/backup-YYYY-MM-DD-HHMMSS.tar.gz
+rm -r /tmp/restore-test/
+```
+
 ### 7. Harden Security 🛡️
 
 Installs Fail2Ban and configures unattended security updates.
@@ -385,7 +405,7 @@ Deploy a Node.js application to Google Cloud Run (Free Tier eligible). The updat
 ### Prerequisites
 - Docker installed on your local machine
 - Artifact Registry created (Phase 1, Step 5)
-- Firestore Database: Created in Phase 1, Step 6.
+- Firestore Database: If not created via Terraform, ensure you manually create a Firestore database in Native mode (see [Troubleshooting - Firestore Errors](#12-firestore-errors)).
 
 ### Deploy to Cloud Run
 ```bash
@@ -447,8 +467,11 @@ This script will:
 
 **Validation:** Check your deployment:
 ```bash
+# Set your values
+REGION="us-central1" # Your cluster region
+
 # Configure kubectl
-gcloud container clusters get-credentials gke-autopilot-cluster --region=us-central1
+gcloud container clusters get-credentials gke-autopilot-cluster --region="${REGION}"
 
 # Check pods and services
 kubectl get pods
@@ -463,8 +486,13 @@ kubectl get ingress hello-gke-ingress -o jsonpath='{.status.loadBalancer.ingress
 
 **Cleanup:** To avoid ongoing charges, destroy the GKE resources:
 ```bash
+# Set your values
+ENABLE_GKE="true"
+ENABLE_VM="false"
+ENABLE_CLOUD_RUN="false"
+
 cd terraform
-terraform destroy -var="enable_gke=true" -var="enable_vm=false" -var="enable_cloud_run=false"
+terraform destroy -var="enable_gke=${ENABLE_GKE}" -var="enable_vm=${ENABLE_VM}" -var="enable_cloud_run=${ENABLE_CLOUD_RUN}"
 ```
 
 Or destroy everything managed by Terraform:
@@ -532,8 +560,11 @@ cost_killer_shutdown_threshold = 1.0 # Shutdown VM at 100% of budget
 Navigate to the `terraform/` directory and initialize with your state bucket:
 
 ```bash
+# Set your values
+TF_STATE_BUCKET="your-project-id-tfstate" # The GCS bucket for your Terraform state
+
 cd terraform
-terraform init -backend-config="bucket=your-project-id-tfstate"
+terraform init -backend-config="bucket=${TF_STATE_BUCKET}"
 ```
 
 Replace `your-project-id-tfstate` with the bucket created in step 1.
@@ -625,8 +656,11 @@ terraform destroy
 ### Manual Setup Cleanup (Phases 1-2)
 
 ```bash
+# Set your values
+ZONE="us-central1-a" # Your VM zone
+
 # Delete the VM
-gcloud compute instances delete free-tier-vm --zone=us-central1-a
+gcloud compute instances delete free-tier-vm --zone="${ZONE}"
 
 # Delete monitoring uptime checks
 gcloud monitoring uptime-checks list
@@ -652,9 +686,10 @@ gcloud secrets delete billing_account_id
 # Delete artifact registry (repository name is 'gke-apps')
 gcloud artifacts repositories delete gke-apps --location=us-central1
 
-# Delete Firestore database (WARNING: Permanent data loss!)
-# To backup your Firestore data before deletion:
-# gcloud firestore export gs://YOUR_BACKUP_BUCKET_NAME/firestore-backup-$(date +%Y%m%d)
+# CRITICAL: Backup Firestore before deletion
+gcloud firestore export gs://YOUR_BACKUP_BUCKET/firestore-backup-$(date +%Y%m%d)
+
+# Delete Firestore database (WARNING: Permanent!)
 gcloud firestore databases delete --database='(default)'
 
 # Delete backup bucket (will delete all backups!)
@@ -689,14 +724,21 @@ terraform destroy
 Or to destroy only GKE resources while keeping VM:
 
 ```bash
+# Set your values
+ENABLE_GKE="true"
+ENABLE_VM="false"
+
 cd terraform
-terraform destroy -var="enable_gke=true" -var="enable_vm=false"
+terraform destroy -var="enable_gke=${ENABLE_GKE}" -var="enable_vm=${ENABLE_VM}"
 ```
 
 Or delete the cluster manually:
 
 ```bash
-gcloud container clusters delete gke-autopilot-cluster --region=us-central1
+# Set your values
+REGION="us-central1" # Your cluster region
+
+gcloud container clusters delete gke-autopilot-cluster --region="${REGION}"
 ```
 
 ### Terraform Cleanup (Phase 5)
@@ -799,15 +841,23 @@ Now every push to the `main` branch will trigger the pipeline.
 
 ### Pre-commit Hooks
 
-A pre-commit hook has been added at `.git/hooks/pre-commit` to help maintain code quality and prevent common issues. This hook will:
-- Check for potential secrets in staged changes.
-- Validate shell scripts syntax.
-- Check Terraform formatting.
+To help maintain code quality and prevent common issues, a pre-commit hook is provided in the `.git-hooks/` directory. This hook includes checks for:
+- Potential secrets in staged changes (e.g., using `trufflehog` or similar).
+- Shell script syntax validation (e.g., using `shellcheck`).
+- Terraform formatting (e.g., `terraform fmt -check`).
 
-To enable this hook, you need to make it executable:
+To enable this hook in your local repository, copy or symlink it to your `.git/hooks/` directory and make it executable:
 ```bash
+mkdir -p .git/hooks/
+cp .git-hooks/pre-commit .git/hooks/pre-commit
 chmod +x .git/hooks/pre-commit
 ```
+
+Alternatively, you can configure Git to use the `.git-hooks` directory directly:
+```bash
+git config core.hooksPath .git-hooks
+```
+Note: If you use `core.hooksPath`, ensure the scripts inside `.git-hooks` are executable (`chmod +x .git-hooks/*`).
 
 ---
 
@@ -836,9 +886,18 @@ chmod +x .git/hooks/pre-commit
 - **Check:** `nslookup your-domain.duckdns.org`
 
 **2. Firestore Errors**
-- **Problem:** App crashes with "Error: No default database found" or permission errors.
-- **Solution:** Ensure you have created the default Firestore database in the GCP Console.
-- **Check:** Go to Cloud Console -> Firestore -> Data to verify database existence.
+- **Problem:** App crashes with "Error: No default database found", "Permission denied", or "Quota exceeded" errors.
+- **Solution:**
+  - **"Database not found"**:
+    - Ensure Firestore database was created. Terraform *does not* create this by default; you must either create it manually in Native mode or set `enable_firestore_database = true` in your `terraform.tfvars`.
+    - Check: `gcloud firestore databases list`
+  - **"Permission denied"**:
+    - Ensure the service account running your application (e.g., Cloud Run, GKE pod) has the `Cloud Datastore User` role (`roles/datastore.user`) on the project.
+    - Check service account IAM bindings in GCP Console.
+  - **"Quota exceeded"**:
+    - Review your Firestore usage in the GCP Console.
+    - Check for sudden spikes in reads/writes.
+    - Consider upgrading your Firestore billing plan or optimizing database operations.
 
 **3. Insufficient Permissions**
 - **Problem:** `gcloud` commands fail with permission errors
@@ -888,6 +947,20 @@ chmod +x .git/hooks/pre-commit
 - **Problem:** `kubectl` commands fail after cluster creation
 - **Solution:** Get credentials: `gcloud container clusters get-credentials CLUSTER_NAME --region=us-central1`
 
+**12. Firestore Errors**
+- **Problem:** App crashes with "Error: No default database found", "Permission denied", or "Quota exceeded" errors.
+- **Solution:**
+  - **"Database not found"**:
+    - Ensure Firestore database was created. Terraform *does not* create this by default; you must either create it manually in Native mode or set `enable_firestore_database = true` in your `terraform.tfvars`.
+    - Check: `gcloud firestore databases list`
+  - **"Permission denied"**:
+    - Ensure the service account running your application (e.g., Cloud Run, GKE pod) has the `Cloud Datastore User` role (`roles/datastore.user`) on the project.
+    - Check service account IAM bindings in GCP Console.
+  - **"Quota exceeded"**:
+    - Review your Firestore usage in the GCP Console.
+    - Check for sudden spikes in reads/writes.
+    - Consider upgrading your Firestore billing plan or optimizing database operations.
+
 ### Getting Help
 
 - Check [GCP Documentation](https://cloud.google.com/docs)
@@ -913,10 +986,12 @@ chmod +x .git/hooks/pre-commit
 
 3. **Enable OS Login**
    ```bash
+   # Set your values
+   ZONE="us-central1-a"
+   
    gcloud compute instances add-metadata free-tier-vm \
      --metadata enable-oslogin=TRUE \
-     --zone=us-central1-a
-   ```
+     --zone="${ZONE}"   ```
 
 4. **Regular security updates**
    - The security script enables unattended-upgrades
@@ -932,6 +1007,10 @@ chmod +x .git/hooks/pre-commit
    - Only open necessary ports
    - Consider restricting SSH to specific IPs
    - Use IAP for SSH access (included in Terraform config)
+   - For public web access, consider additional layers of protection:
+     - Google Cloud Armor for WAF and DDoS protection
+     - Implement Nginx rate limiting (see Nginx documentation)
+     - Utilize a CDN/proxy like Cloudflare in front of the VM
 
 7. **Secure Terraform State Bucket**
    - Apply strict IAM restrictions to your Terraform state bucket (e.g., `roles/storage.objectViewer` for read-only access, `roles/storage.objectAdmin` for write access to specific users/service accounts).
@@ -1045,6 +1124,17 @@ This project is open source and available under the [MIT License](LICENSE).
 
 **Last Updated:** November 29, 2025  
 **Latest Release:** [v2.0.0](https://github.com/BranchingBad/google-free-tier/releases/tag/v2.0.0)
+
+---
+
+## 🖼️ Architecture Diagram (Suggested)
+
+This project would benefit from a visual architecture diagram, illustrating the relationships between:
+- The VM with Nginx
+- Cloud Storage for backups
+- Cloud Monitoring/Alerting
+- The Cost Killer function
+- Firestore integration
 
 ---
 

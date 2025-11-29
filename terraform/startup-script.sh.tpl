@@ -20,44 +20,70 @@ echo "--- Startup Script Initiated ---"
 SECRETS_MARKER="/var/lib/google-free-tier-secrets-fetched"
 if [ ! -f "$SECRETS_MARKER" ]; then
     echo "Fetching secrets..."
-    export DUCKDNS_TOKEN=$(gcloud secrets versions access latest --secret="duckdns_token" --format="value(payload.data)" | base64 --decode)
-    export EMAIL=$(gcloud secrets versions access latest --secret="email_address" --format="value(payload.data)" | base64 --decode)
-    export DOMAIN=$(gcloud secrets versions access latest --secret="domain_name" --format="value(payload.data)" | base64 --decode)
-    # GCS Bucket Name is now injected via Terraform template
-    export GCS_BUCKET_NAME="${gcs_bucket_name}"
-    export BACKUP_DIR=$(gcloud secrets versions access latest --secret="backup_dir" --format="value(payload.data)" | base64 --decode)
+    mkdir -p /root/.credentials
+    chmod 700 /root/.credentials
+    gcloud secrets versions access latest --secret="duckdns_token" --format="value(payload.data)" | base64 --decode > /root/.credentials/duckdns_token
+    chmod 600 /root/.credentials/duckdns_token
+    gcloud secrets versions access latest --secret="email_address" --format="value(payload.data)" | base64 --decode > /root/.credentials/email_address
+    chmod 600 /root/.credentials/email_address
+    gcloud secrets versions access latest --secret="domain_name" --format="value(payload.data)" | base64 --decode > /root/.credentials/domain_name
+    chmod 600 /root/.credentials/domain_name
+    # GCS Bucket Name is now injected via Terraform template.
+    gcloud secrets versions access latest --secret="backup_dir" --format="value(payload.data)" | base64 --decode > /root/.credentials/backup_dir
+    chmod 600 /root/.credentials/backup_dir
     touch "$SECRETS_MARKER"
 else
     echo "Secrets already fetched. Skipping."
 fi
 
 
-# 2. Download setup scripts from GCS
+# 2. Download and verify setup scripts from GCS
 DOWNLOAD_MARKER="/var/lib/google-free-tier-scripts-downloaded"
 if [ ! -f "$DOWNLOAD_MARKER" ]; then
-    echo "Downloading setup scripts from gs://${GCS_BUCKET_NAME}/setup-scripts/..."
-    mkdir -p /tmp/2-host-setup
+    DOWNLOAD_DIR="/tmp/2-host-setup"
+    TARBALL_PATH="${DOWNLOAD_DIR}/setup-scripts.tar.gz"
+    REMOTE_TARBALL_PATH="gs://${gcs_bucket_name}/setup-scripts/setup-scripts.tar.gz"
+    SETUP_SCRIPTS_MD5="${setup_scripts_tarball_md5}" # Passed from Terraform
 
-    # Download with exponential backoff
-    MAX_RETRIES=5
-    for ((i=1; i<=MAX_RETRIES; i++)); do
-      if gsutil -m cp -r "gs://${GCS_BUCKET_NAME}/setup-scripts/*" /tmp/2-host-setup/; then
-        echo "Download successful."
-        # Verify files actually exist
-        if [ -n "$(ls -A /tmp/2-host-setup 2>/dev/null)" ]; then
-          break
-        fi
-      fi
-      if [ $i -eq $MAX_RETRIES ]; then
-        echo "CRITICAL ERROR: Failed to download setup scripts after $MAX_RETRIES attempts."
-        exit 1
-      fi
-      BACKOFF=$((2 ** i))
-      echo "Download failed (Attempt $i/$MAX_RETRIES). Retrying in ${BACKOFF}s..."
-      sleep $BACKOFF
-    done
+    echo "Attempting to download and verify setup scripts from GCS..."
+    mkdir -p "$DOWNLOAD_DIR"
 
-    chmod +x /tmp/2-host-setup/*.sh
+    # Check if tarball exists locally and matches MD5
+    LOCAL_MD5=""
+    if [ -f "$TARBALL_PATH" ]; then
+        LOCAL_MD5=$(md5sum "$TARBALL_PATH" | awk '{print $1}')
+    fi
+
+    if [ "$LOCAL_MD5" == "$SETUP_SCRIPTS_MD5" ]; then
+        echo "Local tarball is up to date (MD5 matches). Skipping download."
+    else
+        echo "Downloading ${REMOTE_TARBALL_PATH}..."
+        MAX_RETRIES=5
+        for ((i=1; i<=MAX_RETRIES; i++)); do
+            if gsutil cp "$REMOTE_TARBALL_PATH" "$TARBALL_PATH"; then
+                echo "Download successful."
+                LOCAL_MD5=$(md5sum "$TARBALL_PATH" | awk '{print $1}')
+                if [ "$LOCAL_MD5" == "$SETUP_SCRIPTS_MD5" ]; then
+                    echo "Checksum verified. MD5 matches."
+                    break
+                else
+                    echo "Checksum mismatch! Local: $LOCAL_MD5, Remote: $SETUP_SCRIPTS_MD5 (Attempt $i/$MAX_RETRIES)"
+                fi
+            fi
+            if [ $i -eq $MAX_RETRIES ]; then
+                echo "CRITICAL ERROR: Failed to download or verify setup scripts after $MAX_RETRIES attempts."
+                exit 1
+            fi
+            BACKOFF=$((2 ** i))
+            echo "Retrying in ${BACKOFF}s..."
+            sleep $BACKOFF
+        done
+    fi
+
+    # Extract scripts
+    echo "Extracting setup scripts to ${DOWNLOAD_DIR}..."
+    tar -xzf "$TARBALL_PATH" -C "$DOWNLOAD_DIR" --strip-components=1 # strip top-level directory
+    chmod +x "${DOWNLOAD_DIR}"/*.sh
     touch "$DOWNLOAD_MARKER"
 else
     echo "Setup scripts already downloaded. Skipping."
@@ -87,6 +113,7 @@ echo "Running setup scripts..."
     if [ -f "$SCRIPT_FAILED_MARKER" ]; then
         echo "Previous run of $SCRIPT failed. Retrying..."
         rm -f "$SCRIPT_FAILED_MARKER"
+        rm -f "$SCRIPT_MARKER" # Also remove completion marker to ensure full retry
     fi
     
     if [ ! -f "$SCRIPT_MARKER" ]; then

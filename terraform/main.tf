@@ -111,7 +111,8 @@ resource "google_compute_instance" "default" {
   tags = ["http-server", "https-server"]
 
   metadata_startup_script = templatefile("${path.module}/startup-script.sh.tpl", {
-    gcs_bucket_name = google_storage_bucket.backup_bucket[0].name
+    gcs_bucket_name         = google_storage_bucket.backup_bucket[0].name,
+    setup_scripts_tarball_md5 = google_storage_bucket_object.setup_scripts_tarball[0].content_md5
   })
 
   service_account {
@@ -158,6 +159,16 @@ resource "google_compute_firewall" "allow_ssh_iap" {
   source_ranges = ["35.235.240.0/20"]
 }
 
+# --- VM Health Check ---
+resource "google_compute_health_check" "vm_health" {
+  count = var.enable_vm ? 1 : 0
+  name  = "vm-health-check"
+  
+  tcp_health_check {
+    port = "80"
+  }
+}
+
 # --- Backups Bucket ---
 
 resource "google_storage_bucket" "backup_bucket" {
@@ -188,11 +199,19 @@ resource "google_storage_bucket_iam_member" "vm_bucket_admin" {
   member = "serviceAccount:${google_service_account.vm_sa[0].email}"
 }
 
-resource "google_storage_bucket_object" "setup_scripts" {
-  for_each = var.enable_vm ? fileset("${path.module}/../2-host-setup", "*") : []
-  name     = "setup-scripts/${each.value}"
-  source   = "${path.module}/../2-host-setup/${each.value}"
-  bucket   = google_storage_bucket.backup_bucket[0].name
+data "archive_file" "setup_scripts_archive" {
+  type        = "tgz"
+  source_dir  = "${path.module}/../2-host-setup"
+  output_path = "${path.module}/setup-scripts.tar.gz"
+}
+
+resource "google_storage_bucket_object" "setup_scripts_tarball" {
+  count  = var.enable_vm ? 1 : 0
+  name   = "setup-scripts/setup-scripts.tar.gz"
+  source = data.archive_file.setup_scripts_archive.output_path
+  bucket = google_storage_bucket.backup_bucket[0].name
+  # This content hash will be used by the startup script for integrity check
+  content_md5 = data.archive_file.setup_scripts_archive.output_md5
 }
 
 # --- Static Assets Bucket (NEW) ---
@@ -303,11 +322,4 @@ resource "google_monitoring_alert_policy" "default" {
   documentation {
     content = "The uptime check for https://${var.domain_name} failed. The server may be down or misconfigured."
   }
-}
-
-# --- Cloud Monitoring Dashboard ---
-resource "google_monitoring_dashboard" "vm_dashboard" {
-  count        = var.enable_vm ? 1 : 0
-  project      = var.project_id
-  dashboard_json = file("${path.module}/dashboards/vm-dashboard.json")
 }

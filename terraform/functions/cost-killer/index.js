@@ -46,7 +46,7 @@ exports.stopBilling = async (message, context) => {
   const budgetAmount = parseFloat(pubsubData.budgetAmount) || 0;
 
   if (isNaN(costAmount) || isNaN(budgetAmount)) {
-    console.error('Invalid cost or budget amount received. Cannot calculate threshold.');
+    console.error(`Invalid amounts - Cost: ${pubsubData.costAmount}, Budget: ${pubsubData.budgetAmount}. Cannot calculate threshold.`);
     return;
   }
   

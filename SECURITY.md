@@ -156,6 +156,7 @@ gcloud logging read "resource.type=gce_instance AND protoPayload.methodName=comp
 - Rotate all credentials regularly (every 90 days minimum)
 - Use Secret Manager's automatic rotation features
 - Document rotation procedures
+- Consider implementing a Cloud Function to send reminders for manual rotation or to fully automate rotation for certain secrets (e.g., DuckDNS token).
 
 **Rotate DuckDNS Token:**
 ```bash

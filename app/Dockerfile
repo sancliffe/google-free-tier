@@ -1,6 +1,7 @@
 # Use an official Node.js runtime as a parent image
 # Upgraded to 20-slim (Active LTS)
-FROM node:20-slim
+ARG NODE_VERSION
+FROM node:${NODE_VERSION}-slim
 
 # Set the working directory in the container
 WORKDIR /usr/src/app

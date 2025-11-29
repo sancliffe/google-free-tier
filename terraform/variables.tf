@@ -91,7 +91,7 @@ variable "enable_cloud_run_domain_mapping" {
 variable "enable_firestore_database" {
   description = "Enable the creation of the Firestore database. Set to false if you create it manually."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "enable_gke" {
@@ -182,7 +182,7 @@ variable "gke_cluster_name" {
 }
 
 variable "nodejs_version" {
-  description = "The Node.js runtime version for Cloud Functions (e.g., 20)."
+  description = "The Node.js runtime version for Cloud Functions. This value *must* align with the version specified in `app/.nvmrc`."
   type        = string
-  default     = "20"
+  default     = "20" # Default kept for manual Terraform runs, but should be overridden by CI/CD
 }
