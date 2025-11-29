@@ -229,8 +229,6 @@ resource "google_storage_bucket_object" "setup_scripts_tarball" {
   name   = "setup-scripts/setup-scripts.tar.gz"
   source = data.archive_file.setup_scripts_archive.output_path
   bucket = google_storage_bucket.backup_bucket[0].name
-  # This content hash will be used by the startup script for integrity check
-  md5hash = data.archive_file.setup_scripts_archive.output_md5
 }
 
 # --- Static Assets Bucket (NEW) ---
