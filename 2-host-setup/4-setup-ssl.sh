@@ -180,8 +180,9 @@ EOF
       fi
 
       if [ $attempt -lt $MAX_ATTEMPTS ]; then
-        log_warn "Attempt $attempt failed. Retrying in 30s..."
-        sleep 30
+        BACKOFF=$((30 * attempt))
+        log_warn "Attempt $attempt failed. Retrying in ${BACKOFF}s..."
+        sleep "$BACKOFF"
       else
         log_error "Certbot failed to obtain an SSL certificate after $MAX_ATTEMPTS attempts."
         log_info "💡 Review errors above and try: sudo certbot --nginx -d ${DOMAIN}"

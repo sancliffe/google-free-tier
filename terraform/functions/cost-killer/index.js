@@ -17,15 +17,20 @@ exports.stopBilling = async (message, context) => {
     return;
   }
 
-  const costAmount = pubsubData.costAmount || 0;
-  const budgetAmount = pubsubData.budgetAmount || 0;
+  const costAmount = parseFloat(pubsubData.costAmount) || 0;
+  const budgetAmount = parseFloat(pubsubData.budgetAmount) || 0;
 
+  if (isNaN(costAmount) || isNaN(budgetAmount)) {
+    console.error('Invalid cost or budget amount received. Cannot calculate threshold.');
+    return;
+  }
+  
   if (budgetAmount === 0) {
     console.warn('Budget amount is zero or missing. Cannot calculate threshold.');
     return;
   }
 
-  // FIXED: Calculate ratio manually to be sure
+  // Calculate ratio
   const costRatio = costAmount / budgetAmount;
   
   console.log(`Budget Status: $${costAmount} / $${budgetAmount} (Ratio: ${costRatio.toFixed(2)})`);

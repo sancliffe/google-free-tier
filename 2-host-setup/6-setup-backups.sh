@@ -88,6 +88,12 @@ log "Destination: gs://${BUCKET_NAME}/"
 [[ -z "${BACKUP_DIR}" ]] && error_exit "BACKUP_DIR not set"
 [[ ! -d "${BACKUP_DIR}" ]] && error_exit "BACKUP_DIR does not exist: ${BACKUP_DIR}"
 
+log "Verifying bucket existence: gs://${BUCKET_NAME}..."
+if ! gsutil ls "gs://${BUCKET_NAME}" >/dev/null 2>&1; then
+    error_exit "Bucket gs://${BUCKET_NAME} does not exist or is not accessible. Please create it first."
+fi
+log "Bucket gs://${BUCKET_NAME} is accessible."
+
 log "Creating archive of ${BACKUP_DIR}..."
 if ! tar -czf "${TEMP_FILE}" -C "$(dirname "${BACKUP_DIR}")" "$(basename "${BACKUP_DIR}")" 2>/dev/null; then
     error_exit "Failed to create archive"

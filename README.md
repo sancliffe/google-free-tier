@@ -221,6 +221,8 @@ The containerized applications (Cloud Run, GKE) use Firestore to persist data.
 gcloud firestore databases create --location=nam5 --type=firestore-native
 ```
 
+**Note on Terraform:** If you run the full Terraform configuration (Phase 5), it will attempt to create this database. If you have already created it manually, you should set `enable_firestore_database = false` in your `terraform.tfvars` file to prevent Terraform from attempting to create an already existing database. This will avoid deployment conflicts.
+
 **Why Native Mode?**
 -   Required for real-time listeners used in modern web applications.
 -   Offers a more feature-rich and flexible data model compared to Datastore mode.
@@ -515,6 +517,7 @@ image_tag               = "latest"
 enable_vm                       = true   # Deploy the e2-micro VM
 enable_cloud_run                = true   # Deploy Cloud Run service
 enable_cloud_run_domain_mapping = false  # Map custom domain to Cloud Run (conflicts with VM on same domain)
+enable_firestore_database       = true   # Enable Firestore database creation (set to false if created manually)
 enable_gke                      = false  # Deploy GKE cluster (costs $20-30/month)
 
 # Budget Configuration
@@ -650,6 +653,8 @@ gcloud secrets delete billing_account_id
 gcloud artifacts repositories delete gke-apps --location=us-central1
 
 # Delete Firestore database (WARNING: Permanent data loss!)
+# To backup your Firestore data before deletion:
+# gcloud firestore export gs://YOUR_BACKUP_BUCKET_NAME/firestore-backup-$(date +%Y%m%d)
 gcloud firestore databases delete --database='(default)'
 
 # Delete backup bucket (will delete all backups!)
@@ -751,6 +756,7 @@ The `cloudbuild.yaml` file defines an automated pipeline:
 
 The Docker image, defined in `app/Dockerfile`, is built with a strong focus on security, reproducibility, and minimal size. Key features of the build process include:
 
+-   **Node.js Version Consistency:** Currently, the Node.js version is specified in `app/.nvmrc` (e.g., `20`), used in `Dockerfile` (e.g., `FROM node:20-slim`), and in Terraform Cloud Function `runtime` (e.g., `"nodejs20"`). For better consistency and easier management, consider creating a shared variable file to define the Node.js version across all configurations.
 -   **Slim Base Image**: Uses `node:20-slim` as the base to reduce the image size and potential attack surface.
 -   **Reproducible Builds**: `npm ci --only=production` is used to install dependencies, ensuring that the exact versions from `package-lock.json` are used every time.
 -   **Non-Root User**: The application is run as a non-root `node` user to limit the container's privileges and enhance security.
@@ -790,6 +796,18 @@ gcloud projects add-iam-policy-binding $(gcloud config get-value project) \
 ```
 
 Now every push to the `main` branch will trigger the pipeline.
+
+### Pre-commit Hooks
+
+A pre-commit hook has been added at `.git/hooks/pre-commit` to help maintain code quality and prevent common issues. This hook will:
+- Check for potential secrets in staged changes.
+- Validate shell scripts syntax.
+- Check Terraform formatting.
+
+To enable this hook, you need to make it executable:
+```bash
+chmod +x .git/hooks/pre-commit
+```
 
 ---
 
@@ -915,15 +933,14 @@ Now every push to the `main` branch will trigger the pipeline.
    - Consider restricting SSH to specific IPs
    - Use IAP for SSH access (included in Terraform config)
 
-7. **Enable 2FA on your GCP account**
+7. **Secure Terraform State Bucket**
+   - Apply strict IAM restrictions to your Terraform state bucket (e.g., `roles/storage.objectViewer` for read-only access, `roles/storage.objectAdmin` for write access to specific users/service accounts).
+   - Ensure only authorized personnel or automation can access state files.
+
+8. **Enable 2FA on your GCP account**
    - Go to https://myaccount.google.com/security
    - Enable 2-Step Verification
    - Use security keys for additional protection
-
-8. **Backup Strategy**
-   - The backup script runs daily at 3 AM
-   - Backups are retained for 7 days (configurable in Terraform)
-   - Test restore procedures regularly
 
 9. **Audit Trail**
    - Enable Cloud Audit Logs

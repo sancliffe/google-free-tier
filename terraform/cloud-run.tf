@@ -90,7 +90,9 @@ resource "google_cloud_run_v2_service" "default" {
   }
 
   depends_on = [
-    google_project_service.cloud_run_apis,
+    google_project_service.cloud_run_apis["run.googleapis.com"],
+    google_project_service.cloud_run_apis["artifactregistry.googleapis.com"],
+    google_project_service.cloud_run_apis["domains.googleapis.com"],
     google_project_iam_member.ar_reader,
     google_storage_bucket.assets_bucket
   ]

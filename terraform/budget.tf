@@ -92,6 +92,12 @@ resource "google_project_iam_member" "cost_killer_sa_compute" {
   depends_on = [google_app_engine_application.app[0]]
 }
 
+resource "time_sleep" "wait_for_iam" {
+  count = var.enable_vm ? 1 : 0
+  depends_on = [google_project_iam_member.cost_killer_sa_compute]
+  create_duration = "60s"
+}
+
 resource "google_cloudfunctions_function" "cost_killer" {
   count                 = var.enable_vm ? 1 : 0
   name                  = "cost-killer"
@@ -118,6 +124,65 @@ resource "google_cloudfunctions_function" "cost_killer" {
   # Ensure APIs and IAM permissions are ready before creating the function
   depends_on = [
     google_project_service.billing_apis,
-    google_project_iam_member.cost_killer_sa_compute
+    google_project_iam_member.cost_killer_sa_compute,
+    time_sleep.wait_for_iam[0]
+  ]
+}
+
+# --- Cloud Function: Backup Monitor ---
+data "archive_file" "backup_monitor_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/functions/backup-monitor"
+  output_path = "${path.module}/functions/backup-monitor.zip"
+}
+
+resource "google_storage_bucket_object" "backup_monitor_zip" {
+  name   = "backup-monitor-${data.archive_file.backup_monitor_zip.output_md5}.zip"
+  bucket = google_storage_bucket.functions_bucket.name
+  source = data.archive_file.backup_monitor_zip.output_path
+}
+
+resource "google_service_account" "backup_monitor_sa" {
+  count        = var.enable_vm ? 1 : 0
+  account_id   = "backup-monitor-sa"
+  display_name = "Backup Monitor Function Service Account"
+}
+
+resource "google_project_iam_member" "backup_monitor_viewer" {
+  count   = var.enable_vm ? 1 : 0
+  project = var.project_id
+  role    = "roles/storage.objectViewer"
+  member  = "serviceAccount:${google_service_account.backup_monitor_sa[0].email}"
+}
+
+resource "google_project_iam_member" "backup_monitor_logger" {
+  count   = var.enable_vm ? 1 : 0
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${google_service_account.backup_monitor_sa[0].email}"
+}
+
+resource "google_cloudfunctions_function" "backup_monitor" {
+  count                 = var.enable_vm ? 1 : 0
+  name                  = "backup-monitor"
+  description           = "Checks daily backups for overdue status"
+  runtime               = "nodejs20"
+  available_memory_mb   = 128
+  source_archive_bucket = google_storage_bucket.functions_bucket.name
+  source_archive_object = google_storage_bucket_object.backup_monitor_zip.name
+  trigger_http          = true
+  entry_point           = "checkBackups"
+  service_account_email = google_service_account.backup_monitor_sa[0].email
+
+  environment_variables = {
+    BACKUP_BUCKET_NAME = google_storage_bucket.backup_bucket[0].name
+    BACKUP_PREFIX      = "backup-" # This matches the backup script's naming convention
+  }
+
+  depends_on = [
+    google_project_service.billing_apis, # cloudfunctions API
+    google_storage_bucket.backup_bucket, # Ensure backup bucket exists
+    google_project_iam_member.backup_monitor_viewer,
+    google_project_iam_member.backup_monitor_logger
   ]
 }

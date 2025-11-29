@@ -37,6 +37,8 @@ spec:
 
         # --- GKE Autopilot Resource Requirements ---
         resources:
+          # These requests (250m CPU, 512Mi memory) meet the minimum requirements for GKE Autopilot.
+          # Refer to GKE Autopilot documentation for updated minimums.
           requests:
             cpu: "250m"
             memory: "512Mi"

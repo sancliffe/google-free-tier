@@ -21,6 +21,8 @@ app.get('/healthz', async (req, res) => {
 
 app.get('/', async (req, res) => {
   let count = 0;
+  let firestoreAvailable = true;
+
   try {
     const docRef = firestore.collection('visits').doc('counter');
     const doc = await docRef.get();
@@ -34,14 +36,9 @@ app.get('/', async (req, res) => {
     }
   } catch (err) {
     console.error('Firestore error:', err);
-    return res.status(500).send(`
-      <html>
-        <body>
-          <h1>Service Temporarily Unavailable</h1>
-          <p>Unable to connect to database. Please try again later.</p>
-        </body>
-      </html>
-    `);
+    firestoreAvailable = false;
+    count = "unavailable";
+    // Don't return 500, continue with degraded service
   }
 
   const html = `
@@ -50,6 +47,7 @@ app.get('/', async (req, res) => {
       <body style="font-family: sans-serif; text-align: center; padding: 2rem;">
         <h1>Hello from a containerized application!</h1>
         <p>Visitor Count: <strong>${count}</strong></p>
+        ${!firestoreAvailable ? '<p><em>Counter temporarily unavailable</em></p>' : ''}
         <hr/>
         <p>
           Static Asset Test: 

@@ -52,30 +52,32 @@ main() {
 DIR="\$(cd "\$(dirname "\$0")" && pwd)"
 LOG_FILE="\${DIR}/duck.log"
 
-# Log format: YYYY-MM-DDTHH:MM:SSZ [Result]
-echo -n "\$(date -u +"%Y-%m-%dT%H:%M:%SZ") " >> "\${LOG_FILE}"
-curl -s "https://www.duckdns.org/update?domains=${DOMAIN}&token=${TOKEN}&ip=" >> "\${LOG_FILE}"
-echo "" >> "\${LOG_FILE}"
+RESPONSE="\$(curl -s "https://www.duckdns.org/update?domains=${DOMAIN}&token=${TOKEN}&ip=")"
+
+if [[ "\$RESPONSE" == "OK" ]]; then
+    echo "\$(date -u +"%Y-%m-%dT%H:%M:%SZ") [OK] DuckDNS update successful: \$RESPONSE" >> "\${LOG_FILE}"
+    exit 0
+else
+    echo "\$(date -u +"%Y-%m-%dT%H:%M:%SZ") [ERROR] DuckDNS update failed: \$RESPONSE" >> "\${LOG_FILE}"
+    exit 1
+fi
 EOF
 
     log_info "Setting script permissions..."
     chmod 700 "${SCRIPT_FILE}"
 
     log_info "Running initial test..."
-    "${SCRIPT_FILE}"
-
-    if tail -n 1 "${LOG_FILE}" | grep -q "OK"; then
-        log_success "DuckDNS update successful."
+    if "${SCRIPT_FILE}"; then
+        log_success "DuckDNS initial update successful."
         log_info "Setting up cron job to run every 5 minutes..."
         
-        CRON_CMD="*/5 * * * * ${SCRIPT_FILE}"
+        CRON_CMD="*/5 * * * * ${SCRIPT_FILE} >> ${LOG_FILE} 2>&1"
         # Safer cron manipulation
         (crontab -l 2>/dev/null | grep -vF "${SCRIPT_FILE}"; echo "${CRON_CMD}") | crontab -
 
         log_success "Cron job successfully configured."
     else
-        log_error "DuckDNS update failed. Please check your settings."
-        log_info "See the log for details: ${LOG_FILE}"
+        log_error "DuckDNS initial update failed. Please check your settings and the log for details: ${LOG_FILE}"
     fi
 
     log_info "-------------------------------------"

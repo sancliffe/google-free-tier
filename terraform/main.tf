@@ -29,6 +29,8 @@ resource "google_project_service" "firestore" {
 
 # Resource to create the Firestore database
 resource "google_firestore_database" "database" {
+  count = var.enable_firestore_database ? 1 : 0
+
   project     = var.project_id
   name        = "(default)"
   location_id = "nam5"
@@ -100,7 +102,11 @@ resource "google_compute_instance" "default" {
 
   service_account {
     email  = google_service_account.vm_sa[0].email
-    scopes = ["cloud-platform"]
+    scopes = [
+      "https://www.googleapis.com/auth/logging.write",
+      "https://www.googleapis.com/auth/monitoring.write",
+      "https://www.googleapis.com/auth/devstorage.read_write"
+    ]
   }
 
   depends_on = [
@@ -109,6 +115,8 @@ resource "google_compute_instance" "default" {
 }
 
 resource "google_compute_firewall" "allow_http_https" {
+  # Note: 0.0.0.0/0 is necessary for public web access.
+  # For production environments, consider adding Cloud Armor for DDoS protection and rate limiting.
   count   = var.enable_vm ? 1 : 0
   name    = "allow-http-https"
   network = "default"
@@ -281,4 +289,11 @@ resource "google_monitoring_alert_policy" "default" {
   documentation {
     content = "The uptime check for https://${var.domain_name} failed. The server may be down or misconfigured."
   }
+}
+
+# --- Cloud Monitoring Dashboard ---
+resource "google_monitoring_dashboard" "vm_dashboard" {
+  count        = var.enable_vm ? 1 : 0
+  project      = var.project_id
+  dashboard_json = file("${path.module}/dashboards/vm-dashboard.json")
 }

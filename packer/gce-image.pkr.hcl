@@ -46,7 +46,7 @@ build {
     valid_exit_codes = [0]
     inline = [
       "set -euxo pipefail",  # Add -x for debugging
-      "sudo apt-get update",
+      "sudo apt-get update || (sleep 10 && sudo apt-get update)",
       "sudo apt-get install -y nginx"
     ]
   }
