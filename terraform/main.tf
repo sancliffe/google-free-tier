@@ -21,25 +21,39 @@ provider "google" {
   zone    = var.zone
 }
 
+locals {
+  environment = terraform.workspace
+  
+  # Environment-specific overrides
+  config = {
+    dev = {
+      enable_vm        = true
+      enable_cloud_run = false
+      enable_gke       = false
+    }
+    staging = {
+      enable_vm        = false
+      enable_cloud_run = true
+      enable_gke       = false
+    }
+    prod = {
+      enable_vm        = true
+      enable_cloud_run = true
+      enable_gke       = true
+    }
+  }
+}
+
 # Enable Firestore API
 resource "google_project_service" "firestore" {
   service            = "firestore.googleapis.com"
   disable_on_destroy = false
 }
 
-# Resource to create the Firestore database
-resource "google_firestore_database" "database" {
-  count = var.enable_firestore_database ? 1 : 0
-
-  project     = var.project_id
-  name        = "(default)"
-  location_id = "nam5"
-  type        = "FIRESTORE_NATIVE"
-  
-  lifecycle {
-    # Prevent accidental deletion
-    prevent_destroy = true
-  }
+data "google_firestore_database" "database" {
+  count    = var.enable_firestore_database ? 1 : 0 # Use 1 if enabled, 0 otherwise, to reference an existing DB
+  project  = var.project_id
+  database = "(default)"
 }
 
 # --- Service Account & IAM ---

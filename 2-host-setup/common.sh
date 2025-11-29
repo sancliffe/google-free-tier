@@ -71,8 +71,9 @@ ensure_root() {
     if [[ "${EUID}" -ne 0 ]]; then
         log_error "This script must be run as root."
         log_info "👉 Try running: sudo bash ${0##*/}"
-        exit 1
+        return 1
     fi
+    return 0
 }
 
 # --- Stability: Wait for Apt Locks ---
@@ -109,9 +110,10 @@ ensure_command() {
         if [[ -n "${install_hint}" ]]; then
             log_info "💡 Install hint: ${install_hint}"
         fi
-        exit 1
+        return 1
     fi
     log_debug "Command '${cmd}' is available."
+    return 0
 }
 
 # --- Disk Space Checking ---
@@ -125,9 +127,10 @@ check_disk_space() {
     
     if [[ "${available_mb}" -lt "${min_space_mb}" ]]; then
         log_error "Insufficient disk space in ${target_path}. Required: ${min_space_mb}MB, Available: ${available_mb}MB"
-        exit 1
+        return 1
     fi
     log_debug "Disk space check passed: ${available_mb}MB available (need ${min_space_mb}MB)"
+    return 0
 }
 
 # --- File Backup Function ---

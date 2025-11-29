@@ -3,7 +3,16 @@ terraform {
   #   bucket = "<YOUR_PROJECT_ID>-tfstate"
   #   prefix = "terraform/state"
   # }
+  
+  # Add validation
+  required_version = ">= 1.3.0"
 }
+
+# Add data source to verify bucket
+data "google_storage_bucket" "tfstate" {
+  name = "${var.project_id}-tfstate"
+}
+
 
 # --- Backend Configuration Guide ---
 #

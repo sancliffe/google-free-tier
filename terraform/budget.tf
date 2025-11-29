@@ -102,7 +102,7 @@ resource "google_cloudfunctions_function" "cost_killer" {
   count                 = var.enable_vm ? 1 : 0
   name                  = "cost-killer"
   description           = "Stops the VM when billing budget is exceeded"
-  runtime               = "nodejs20"
+  runtime               = "nodejs${var.nodejs_version}"
   available_memory_mb   = 128
   source_archive_bucket = google_storage_bucket.functions_bucket.name
   source_archive_object = google_storage_bucket_object.cost_killer_zip.name
@@ -166,7 +166,7 @@ resource "google_cloudfunctions_function" "backup_monitor" {
   count                 = var.enable_vm ? 1 : 0
   name                  = "backup-monitor"
   description           = "Checks daily backups for overdue status"
-  runtime               = "nodejs20"
+  runtime               = "nodejs${var.nodejs_version}"
   available_memory_mb   = 128
   source_archive_bucket = google_storage_bucket.functions_bucket.name
   source_archive_object = google_storage_bucket_object.backup_monitor_zip.name

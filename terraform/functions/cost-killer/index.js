@@ -1,6 +1,31 @@
 const { InstancesClient } = require('@google-cloud/compute');
 const compute = new InstancesClient();
 
+async function stopInstanceWithRetry(projectId, zone, instanceName, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      console.log(`Attempt ${i + 1}: Stopping instance ${instanceName} in zone ${zone}...`);
+      const [response] = await compute.stop({
+        project: projectId,
+        zone: zone,
+        instance: instanceName,
+      });
+      
+      console.log(`Stop request successful: ${response.status}`);
+      return response;
+    } catch (err) {
+      console.error(`Attempt ${i + 1} failed:`, err.message);
+      
+      if (i === maxRetries - 1) {
+        throw err;
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 2000 * (i + 1))); // Exponential backoff
+    }
+  }
+}
+
+
 /**
  * Triggered from a message on a Cloud Pub/Sub topic.
  *
@@ -49,17 +74,9 @@ exports.stopBilling = async (message, context) => {
 
     if (instanceName && zone && projectId) {
       try {
-        console.log(`Stopping instance: ${instanceName} in zone ${zone}...`);
-        
-        const [response] = await compute.stop({
-          project: projectId,
-          zone: zone,
-          instance: instanceName,
-        });
-
-        console.log(`Stop request successfully sent. Operation status: ${response.status}`);
+        await stopInstanceWithRetry(projectId, zone, instanceName);
       } catch (err) {
-        console.error('FATAL ERROR: Failed to stop instance:', err);
+        console.error('FATAL ERROR: Failed to stop instance after multiple retries:', err);
       }
     } else {
       console.error('Missing configuration (PROJECT_ID, ZONE, or INSTANCE_NAME). Skipping VM shutdown.');

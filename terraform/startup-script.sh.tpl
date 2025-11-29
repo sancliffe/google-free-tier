@@ -82,18 +82,33 @@ echo "Running setup scripts..."
 
   for SCRIPT in "${SCRIPT_NAMES[@]}"; do
     SCRIPT_MARKER="/var/lib/google-free-tier-${SCRIPT}-complete"
+    SCRIPT_FAILED_MARKER="/var/lib/google-free-tier-${SCRIPT}-failed"
+    
+    if [ -f "$SCRIPT_FAILED_MARKER" ]; then
+        echo "Previous run of $SCRIPT failed. Retrying..."
+        rm -f "$SCRIPT_FAILED_MARKER"
+    fi
+    
     if [ ! -f "$SCRIPT_MARKER" ]; then
         echo "Running /tmp/2-host-setup/$SCRIPT"
+        local script_cmd
         case "$SCRIPT" in
             "3-setup-duckdns.sh"|"4-setup-ssl.sh"|"6-setup-backups.sh")
-                sudo -E "/tmp/2-host-setup/$SCRIPT" || exit 1 # Keep environment for secrets
+                script_cmd="sudo -E /tmp/2-host-setup/$SCRIPT" # Keep environment for secrets
                 ;;
             *)
-                sudo "/tmp/2-host-setup/$SCRIPT" || exit 1
+                script_cmd="sudo /tmp/2-host-setup/$SCRIPT"
                 ;;
         esac
-        touch "$SCRIPT_MARKER"
-        echo "/tmp/2-host-setup/$SCRIPT completed."
+
+        if eval "$script_cmd"; then
+            touch "$SCRIPT_MARKER"
+            echo "/tmp/2-host-setup/$SCRIPT completed."
+        else
+            echo "ERROR: /tmp/2-host-setup/$SCRIPT failed."
+            touch "$SCRIPT_FAILED_MARKER"
+            exit 1 # Exit the startup script if a sub-script fails
+        fi
     else
         echo "/tmp/2-host-setup/$SCRIPT already completed. Skipping."
     fi

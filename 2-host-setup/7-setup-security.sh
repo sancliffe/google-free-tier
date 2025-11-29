@@ -9,7 +9,7 @@ source "${SCRIPT_DIR}/common.sh"
 # --- Main Logic ---
 main() {
     log_info "--- Phase 7: Hardening Server Security ---"
-    ensure_root
+    ensure_root || exit 1
 
     # --- 1. Fail2Ban ---
     if dpkg-query -W fail2ban &>/dev/null; then
@@ -59,45 +59,31 @@ EOF
     # --- 3. SSH Hardening ---
     log_info "Hardening SSH configuration..."
 
-    # FIXED: Check for SSH keys before disabling password auth to prevent lockout
-    local has_keys=false
-
-    # Attempt to verify SSH key authentication using gcloud (external check)
-    # This assumes `gcloud` CLI is installed and configured on the VM,
-    # which is often not the case. We include it as a robust check
-    # if the environment supports it.
-    if command -v gcloud &>/dev/null; then
-        log_info "Attempting external SSH key authentication check via gcloud..."
-        # Note: This command checks if gcloud can *dry-run* an SSH connection
-        # to *this VM*. If it produces a 'Warning', it implies key auth isn't setup.
-        # We assume the VM name is 'free-tier-vm' and zone is 'us-central1-a'
-        # as per the rest of the guide.
-        if gcloud compute ssh free-tier-vm --zone=us-central1-a --command="echo 'Key auth works'" --dry-run 2>&1 | grep -q "Warning"; then
-            log_warn "gcloud reported a Warning for SSH key authentication. This likely means key auth is not properly configured for external access."
-        else
-            log_success "gcloud reported no Warning for SSH key authentication dry-run. Assuming key auth is functional."
+    # More reliable check for SSH keys before disabling password auth to prevent lockout
+    check_ssh_keys() {
+        local has_keys=false
+        
+        # Check if we're connected via SSH key right now
+        if [ -n "${SSH_CONNECTION:-}" ]; then
+            # Check the auth method of current session (requires sudo/root to read auth.log)
+            if grep -q "Accepted publickey" /var/log/auth.log 2>/dev/null; then
+                log_info "Current SSH session using key authentication"
+                has_keys=true
+            fi
+        fi
+        
+        # Check for any authorized_keys
+        if [ -s "$HOME/.ssh/authorized_keys" ] || \
+           [ -s /root/.ssh/authorized_keys ]; then
             has_keys=true
         fi
-    else
-        log_warn "gcloud CLI not found on VM. Skipping external SSH key authentication check."
-    fi
-
-    # Fallback/supplemental internal checks for authorized_keys files
-    if [[ "$has_keys" == "false" ]]; then
-        log_info "Performing internal checks for SSH authorized_keys files..."
-        # Check root keys
-        if [[ -f /root/.ssh/authorized_keys && -s /root/.ssh/authorized_keys ]]; then has_keys=true; fi
-        # Check OS Login (Google Compute Engine specific)
-        if [[ -f /var/google-users.d ]]; then has_keys=true; fi
-        # Check other user keys
-        if grep -q "ssh-rsa\|ssh-ed25519" /home/*/.ssh/authorized_keys 2>/dev/null; then has_keys=true; fi
         
-        if [[ "$has_keys" == "true" ]]; then
-            log_success "Internal SSH key checks found authorized_keys. Proceeding with hardening."
-        else
-            log_warn "No SSH authorized_keys files found internally either."
-        fi
-    fi
+        echo "$has_keys"
+    }
+
+    local has_keys
+    has_keys=$(check_ssh_keys)
+
 
     if [[ "$has_keys" == "false" ]]; then
         log_warn "NO SSH KEYS DETECTED! Skipping SSH hardening to prevent lockout."

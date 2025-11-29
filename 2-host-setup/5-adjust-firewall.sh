@@ -11,7 +11,7 @@ source "${SCRIPT_DIR}/common.sh"
 
 main() {
     log_info "--- Phase 5: Adjusting Local Firewall (UFW) ---"
-    ensure_root
+    ensure_root || exit 1
 
     # Check if ufw is installed
     #

@@ -42,6 +42,12 @@ main() {
     log_info "Creating installation directory at ${INSTALL_DIR}..."
     mkdir -p "${INSTALL_DIR}"
 
+    log_info "Storing DuckDNS token securely in ${INSTALL_DIR}/.token..."
+    cat <<EOF > "${INSTALL_DIR}/.token"
+${TOKEN}
+EOF
+    chmod 600 "${INSTALL_DIR}/.token"
+
     log_info "Creating updater script: ${SCRIPT_FILE}"
     
     cat <<EOF > "${SCRIPT_FILE}"
@@ -52,7 +58,8 @@ main() {
 DIR="\$(cd "\$(dirname "\$0")" && pwd)"
 LOG_FILE="\${DIR}/duck.log"
 
-RESPONSE="\$(curl -s "https://www.duckdns.org/update?domains=${DOMAIN}&token=${TOKEN}&ip=")"
+TOKEN="$(cat "${DIR}/.token")"
+RESPONSE="\$(curl -s "https://www.duckdns.org/update?domains=${DOMAIN}&token=\${TOKEN}&ip=")"
 
 if [[ "\$RESPONSE" == "OK" ]]; then
     echo "\$(date -u +"%Y-%m-%dT%H:%M:%SZ") [OK] DuckDNS update successful: \$RESPONSE" >> "\${LOG_FILE}"

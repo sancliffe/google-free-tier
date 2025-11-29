@@ -8,14 +8,40 @@ const ASSETS_URL = process.env.ASSETS_URL || '';
 // Initialize Firestore
 const firestore = new Firestore();
 
-// Add health check for Firestore
+// Add comprehensive health check
 app.get('/healthz', async (req, res) => {
+  const checks = {
+    firestore: false,
+    memory: false,
+    uptime: false
+  };
+  
   try {
+    // Firestore check
     await firestore.collection('_health').limit(1).get();
-    res.status(200).send('OK');
+    checks.firestore = true;
+    
+    // Memory check
+    const used = process.memoryUsage();
+    checks.memory = used.heapUsed < (used.heapTotal * 0.9);
+    
+    // Uptime check
+    checks.uptime = process.uptime() > 0;
+    
+    const healthy = Object.values(checks).every(v => v);
+    
+    if (healthy) {
+      res.status(200).json({ status: 'healthy', checks });
+    } else {
+      res.status(503).json({ status: 'unhealthy', checks });
+    }
   } catch (err) {
     console.error('Health check failed:', err);
-    res.status(503).send('Service Unavailable');
+    res.status(503).json({ 
+      status: 'unhealthy', 
+      checks,
+      error: err.message 
+    });
   }
 });
 

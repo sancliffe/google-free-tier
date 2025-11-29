@@ -13,7 +13,7 @@ BACKUP_LOG_DIR="/var/log"
 # --- Main Logic ---
 main() {
     log_info "--- Phase 6: Setting up Automated Backups ---"
-    ensure_root
+    ensure_root || exit 1
 
     local BUCKET_NAME="${1:-${GCS_BUCKET_NAME}}"
     local BACKUP_DIR="${2:-${BACKUP_DIR}}"
@@ -56,6 +56,14 @@ main() {
         log_success "gsutil is available."
     fi
 
+    log_info "Verifying bucket exists and is accessible..."
+    if ! gsutil ls "gs://${BUCKET_NAME}/" >/dev/null 2>&1; then
+        log_error "Bucket gs://${BUCKET_NAME} does not exist. Creating it now..."
+        gsutil mb -l "${REGION}" "gs://${BUCKET_NAME}/" || {
+            log_error "Failed to create bucket"
+            exit 1
+        }
+    fi
     log_info "Creating backup script at ${BACKUP_SCRIPT_PATH}..."
     
     cat <<'EOF' > "${BACKUP_SCRIPT_PATH}"

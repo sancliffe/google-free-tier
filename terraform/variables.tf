@@ -7,11 +7,21 @@ variable "duckdns_token" {
 variable "email_address" {
   description = "The email address for SSL certificate renewal notices."
   type        = string
+  
+  validation {
+    condition     = can(regex("^[^@]+@[^@]+\\.[^@]+$", var.email_address))
+    error_message = "Must be a valid email address."
+  }
 }
 
 variable "domain_name" {
   description = "The domain name (e.g., my.duckdns.org)."
   type        = string
+  
+  validation {
+    condition     = can(regex("^[a-z0-9.-]+\\.[a-z]{2,}$", var.domain_name))
+    error_message = "Domain name must be a valid FQDN."
+  }
 }
 
 variable "gcs_bucket_name" {
@@ -149,9 +159,14 @@ variable "boot_disk_type" {
 }
 
 variable "budget_amount" {
-  description = "The amount to set the budget alert at (e.g. 1 USD)."
+  description = "The amount to set the budget alert at."
   type        = string
   default     = "1"
+  
+  validation {
+    condition     = can(tonumber(var.budget_amount)) && tonumber(var.budget_amount) > 0
+    error_message = "Budget amount must be a positive number."
+  }
 }
 
 variable "cost_killer_shutdown_threshold" {
@@ -164,4 +179,10 @@ variable "gke_cluster_name" {
   description = "The name of the GKE cluster."
   type        = string
   default     = "gke-autopilot-cluster"
+}
+
+variable "nodejs_version" {
+  description = "The Node.js runtime version for Cloud Functions (e.g., 20)."
+  type        = string
+  default     = "20"
 }

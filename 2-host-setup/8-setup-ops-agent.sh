@@ -8,7 +8,7 @@ source "${SCRIPT_DIR}/common.sh"
 
 main() {
     log_info "--- Phase 8: Installing Google Cloud Ops Agent ---"
-    ensure_root
+    ensure_root || exit 1
 
     if command -v google-cloud-ops-agent &> /dev/null; then
         log_success "Ops Agent is already installed."

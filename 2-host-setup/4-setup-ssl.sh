@@ -27,7 +27,7 @@ check_dns() {
     log_info "Performing DNS pre-flight check for ${DOMAIN}..."
     
     # Verify dig is available
-    ensure_command "dig" "Install: sudo apt-get install dnsutils"
+    ensure_command "dig" "Install: sudo apt-get install dnsutils" || exit 1
     
     # Get public IP with timeout
     log_debug "Retrieving public IP address..."
@@ -68,7 +68,7 @@ check_dns() {
 # --- Main Logic ---
 main() {
     log_info "--- Phase 4: Setting up SSL with Let's Encrypt ---"
-    ensure_root
+    ensure_root || exit 1
 
     DOMAIN="${1:-${DOMAIN:-}}"
     EMAIL="${2:-${EMAIL:-}}"

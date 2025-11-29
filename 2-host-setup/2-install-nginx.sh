@@ -18,10 +18,10 @@ source "${SCRIPT_DIR}/common.sh"
 main() {
     log_info "--- Phase 2: Installing Nginx ---"
     
-    ensure_root
+    ensure_root || exit 1
     
     # Check disk space
-    check_disk_space "/" 500  # Need ~500MB for Nginx
+    check_disk_space "/" 500 || exit 1 # Need ~500MB for Nginx
 
     # Check if Nginx is already installed
     #

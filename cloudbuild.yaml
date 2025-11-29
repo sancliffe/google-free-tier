@@ -1,6 +1,7 @@
-timeout: 1200s # 20 minutes
+timeout: 3600s # 60 minutes for safety
 options:
   logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'  # Faster builds
 
 steps:
 # 1. Lint shell scripts

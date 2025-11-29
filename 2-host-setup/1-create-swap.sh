@@ -19,10 +19,10 @@ SWAPPINESS_VALUE="10" # 10 is a good value for servers
 
 main() {
     log_info "--- Phase 1: Configuring Swap File ---"
-    ensure_root
+    ensure_root || exit 1
 
     # Check disk space before creating swap
-    check_disk_space "/" 2500  # Need ~2.5GB for 2GB swap file
+    check_disk_space "/" 2500 || exit 1 # Need ~2.5GB for 2GB swap file
     
     # Check if the swap file is already configured in /etc/fstab
     #
