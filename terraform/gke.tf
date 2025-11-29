@@ -29,20 +29,23 @@ resource "google_project_iam_member" "gke_firestore_user" {
   project = var.project_id
   role    = "roles/datastore.user"
   member  = "serviceAccount:${var.project_id}.svc.id.goog[default/default]"
+  depends_on = [
+    google_container_cluster.default,
+  ]
 }
 
 data "google_client_config" "default" {}
 
 provider "kubernetes" {
-  host                   = try(google_container_cluster.default[0].endpoint, "")
+  host                   = var.enable_gke ? google_container_cluster.default[0].endpoint : ""
   token                  = data.google_client_config.default.access_token
-  cluster_ca_certificate = try(base64decode(google_container_cluster.default[0].master_auth[0].cluster_ca_certificate), "")
+  cluster_ca_certificate = var.enable_gke ? base64decode(google_container_cluster.default[0].master_auth[0].cluster_ca_certificate) : ""
 }
 
 provider "kubectl" {
-  host                   = try(google_container_cluster.default[0].endpoint, "")
+  host                   = var.enable_gke ? google_container_cluster.default[0].endpoint : ""
   token                  = data.google_client_config.default.access_token
-  cluster_ca_certificate = try(base64decode(google_container_cluster.default[0].master_auth[0].cluster_ca_certificate), "")
+  cluster_ca_certificate = var.enable_gke ? base64decode(google_container_cluster.default[0].master_auth[0].cluster_ca_certificate) : ""
   load_config_file       = false
 }
 

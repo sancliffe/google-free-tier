@@ -28,11 +28,15 @@ steps:
     - 'build'
     - '-t'
     - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/hello-app:${SHORT_SHA}'
+    - '-t'
+    - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/hello-app:latest'
     - './app'
 
 # 4. Push Docker
 - name: 'gcr.io/cloud-builders/docker'
   args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/hello-app:${SHORT_SHA}']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/hello-app:latest']
 
 # 5. Initialize Terraform
 - name: 'hashicorp/terraform:1.8.4'
@@ -65,6 +69,7 @@ steps:
 
 images:
   - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/hello-app:${SHORT_SHA}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/hello-app:latest'
 
 substitutions:
   _REGION: 'us-central1'

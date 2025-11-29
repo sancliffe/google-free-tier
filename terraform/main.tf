@@ -27,10 +27,17 @@ resource "google_project_service" "firestore" {
   disable_on_destroy = false
 }
 
-# Data source to check for existing Firestore database
-data "google_firestore_database" "database" {
-  project  = var.project_id
-  database = "(default)"
+# Resource to create the Firestore database
+resource "google_firestore_database" "database" {
+  project     = var.project_id
+  name        = "(default)"
+  location_id = "nam5"
+  type        = "FIRESTORE_NATIVE"
+  
+  lifecycle {
+    # Prevent accidental deletion
+    prevent_destroy = true
+  }
 }
 
 # --- Service Account & IAM ---
@@ -174,6 +181,26 @@ resource "google_storage_bucket" "assets_bucket" {
   location                    = var.region
   uniform_bucket_level_access = true
   force_destroy               = true # CAUTION: Deletes bucket even if it has files
+
+  # Add lifecycle rules for cost optimization
+  lifecycle_rule {
+    condition {
+      age = 30 # Delete objects older than 30 days
+    }
+    action {
+      type = "Delete"
+    }
+  }
+
+  lifecycle_rule {
+    condition {
+      num_newer_versions = 5 # Keep only 5 non-current versions
+      with_state         = "ARCHIVED"
+    }
+    action {
+      type = "Delete"
+    }
+  }
 
   cors {
     origin          = ["https://${var.domain_name}"]

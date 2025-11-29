@@ -61,7 +61,8 @@ echo "Running setup scripts..."
   sudo -E /tmp/2-host-setup/6-setup-backups.sh
   sudo /tmp/2-host-setup/7-setup-security.sh
   sudo /tmp/2-host-setup/8-setup-ops-agent.sh
-) && touch /var/lib/google-free-tier-setup-complete || {
+) # Create marker file ONLY if all setup scripts succeed
+&& touch /var/lib/google-free-tier-setup-complete || {
   echo "ERROR: Setup scripts failed. Check /var/log/startup-script.log"
   exit 1
 }
