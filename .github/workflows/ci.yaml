@@ -24,6 +24,7 @@ jobs:
     name: Lint and Validate
     runs-on: ubuntu-latest
     steps:
+      # ✅ CHECKOUT MUST RUN FIRST to download the code and lock files
       - uses: actions/checkout@v4
 
       - name: Setup Node.js (with caching)
@@ -31,6 +32,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+          # This pattern searches for package-lock.json in root and subdirectories
           cache-dependency-path: '**/package-lock.json'
 
       - name: Validate shell scripts
