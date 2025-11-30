@@ -78,7 +78,7 @@ set -euo pipefail
 BUCKET_NAME="${GCS_BUCKET_NAME:-}"
 BACKUP_DIR="${BACKUP_DIR:-}"
 BACKUP_FILENAME="backup-$(date -u +"%Y-%m-%d-%H%M%S").tar.gz"
-TEMP_FILE="/tmp/${BACKUP_FILENAME}"
+TEMP_FILE=$(mktemp -t "${BACKUP_FILENAME}.XXXXXX")
 
 log() { 
     echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] $1" 

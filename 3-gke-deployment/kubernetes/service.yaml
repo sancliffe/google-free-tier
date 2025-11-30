@@ -3,7 +3,8 @@ kind: Service
 metadata:
   name: hello-gke-service
 spec:
-  # This makes the service publicly accessible via a GCP Load Balancer
+  # This exposes the service on a static port on each node's IP.
+  # It is the Ingress that manages public-facing access and the Load Balancer.
   type: NodePort
   selector:
     app: hello-gke # This must match the 'app' label in the Deployment

@@ -93,7 +93,10 @@ main() {
         log_info "Creating Nginx server block for ${DOMAIN}..."
         
         # Backup default config before modification
-        backup_file "/etc/nginx/sites-available/default" "/tmp"
+        local backup_dir
+        backup_dir=$(mktemp -d)
+        trap 'rm -rf "${backup_dir}"' EXIT
+        backup_file "/etc/nginx/sites-available/default" "${backup_dir}"
         
         # Added stub_status for Google Cloud Ops Agent metrics
         cat <<EOF > "${nginx_config}"

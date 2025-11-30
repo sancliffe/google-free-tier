@@ -35,6 +35,9 @@ fi
 main() {
     log_info "--- GCP Monitoring Setup ---" 
     
+    echo -e "\033[0;33mWARNING: The information you enter will be stored in your shell's history.\033[0m"
+    echo -e "\033[0;33mTo avoid this, you can run the script in a new shell with 'bash' and exit immediately after.\033[0m"
+
     local project_id
     project_id=$(gcloud config get-value project)
     log_info "Operating in project: ${project_id}"

@@ -29,8 +29,13 @@ fi
 # --- Cost Saving: Apply Cleanup Policy ---
 echo "Applying cleanup policy (Keep last 5 versions, delete untagged)..."
 
+# Create a secure temporary file for the policy
+POLICY_FILE=$(mktemp)
+# Ensure cleanup
+trap 'rm -f "${POLICY_FILE}"' EXIT
+
 # Create a temporary policy file
-cat <<EOF > /tmp/cleanup-policy.json
+cat <<EOF > "${POLICY_FILE}"
 [
   {
     "name": "keep-last-5-versions",
@@ -47,7 +52,7 @@ EOF
 
 gcloud artifacts repositories set-cleanup-policies "${REPO_NAME}" \
     --location="${REGION}" \
-    --policy-file=/tmp/cleanup-policy.json \
+    --policy-file="${POLICY_FILE}" \
     --no-dry-run
 
 echo "Cleanup policy applied."
