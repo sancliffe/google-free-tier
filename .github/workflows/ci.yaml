@@ -125,17 +125,30 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Generate SHA256 checksums for release assets
+      - name: Create release archives
         run: |
-          # Create dist directory and generate checksums for release artifacts
           mkdir -p dist/
-          # Add files to dist if they exist (scripts, terraform configs, docker image info, etc.)
-          if [ -d "app/" ]; then cp -r app/ dist/; fi
-          if [ -d "terraform/" ]; then cp -r terraform/ dist/; fi
-          if [ -d "scripts/" ]; then cp -r scripts/ dist/; fi
-          if [ -f "README.md" ]; then cp README.md dist/; fi
-          # Generate checksums for all files in dist
-          cd dist && find . -type f ! -name "sha256sums.txt" -exec sha256sum {} \; > sha256sums.txt && cd ..
+          
+          # Copy documentation files with unique names to avoid conflicts
+          cp README.md dist/README.md
+          cp CONTRIBUTING.md dist/CONTRIBUTING.md
+          cp SECURITY.md dist/SECURITY.md
+          cp CODE_OF_CONDUCT.md dist/CODE_OF_CONDUCT.md
+          cp LICENSE dist/LICENSE
+          
+          # Create archives to preserve directory structure and avoid filename conflicts
+          tar -czf dist/app.tar.gz app/
+          tar -czf dist/terraform.tar.gz terraform/
+          tar -czf dist/scripts.tar.gz scripts/
+          tar -czf dist/host-setup.tar.gz 2-host-setup/
+          tar -czf dist/gcp-setup.tar.gz 1-gcp-setup/
+          tar -czf dist/cloud-run.tar.gz 3-cloud-run-deployment/
+          tar -czf dist/gke.tar.gz 3-gke-deployment/
+          
+          # Generate checksums for verification
+          cd dist
+          sha256sum *.tar.gz *.md LICENSE > sha256sums.txt
+          cd ..
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -145,6 +158,52 @@ jobs:
           files: |
             dist/sha256sums.txt
             dist/README.md
-            dist/app/**/*
-            dist/terraform/**/*
-            dist/scripts/**/*
+            dist/CONTRIBUTING.md
+            dist/SECURITY.md
+            dist/CODE_OF_CONDUCT.md
+            dist/LICENSE
+            dist/app.tar.gz
+            dist/terraform.tar.gz
+            dist/scripts.tar.gz
+            dist/host-setup.tar.gz
+            dist/gcp-setup.tar.gz
+            dist/cloud-run.tar.gz
+            dist/gke.tar.gz
+          body: |
+            ## 📦 Release Archives
+            
+            This release provides organized archives for each component:
+            
+            ### Core Components
+            - **app.tar.gz** - Node.js application and Dockerfile
+            - **terraform.tar.gz** - Infrastructure as Code configurations
+            - **scripts.tar.gz** - Utility and validation scripts
+            
+            ### Setup Scripts
+            - **host-setup.tar.gz** - VM configuration scripts (Phase 2)
+            - **gcp-setup.tar.gz** - GCP project setup scripts (Phase 1)
+            - **cloud-run.tar.gz** - Cloud Run deployment scripts (Phase 3)
+            - **gke.tar.gz** - Kubernetes/GKE deployment scripts (Phase 4)
+            
+            ### Documentation
+            - **README.md** - Complete project documentation
+            - **CONTRIBUTING.md** - Contribution guidelines
+            - **SECURITY.md** - Security policies
+            - **CODE_OF_CONDUCT.md** - Community guidelines
+            - **LICENSE** - MIT License
+            
+            ## 📥 Quick Start
+            
+            ```bash
+            # Download and extract an archive
+            wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/app.tar.gz
+            tar -xzf app.tar.gz
+            
+            # Verify checksums
+            wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/sha256sums.txt
+            sha256sum -c sha256sums.txt
+            ```
+            
+            ## ✅ Verification
+            
+            All files include SHA256 checksums in `sha256sums.txt` for integrity verification.
