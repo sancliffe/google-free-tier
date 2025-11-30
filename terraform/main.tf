@@ -88,25 +88,11 @@ resource "google_firestore_database" "database" {
 }
 
 # Deploy Firestore security rules
-resource "google_firestore_ruleset" "rules" {
-  count   = var.enable_firestore_database ? 1 : 0
-  project = var.project_id
-  source {
-    files {
-      name    = "firestore.rules"
-      content = file("${path.module}/firestore.rules")
-    }
-  }
-  depends_on = [google_firestore_database.database]
-}
-
-resource "google_firestore_release" "release" {
-  count        = var.enable_firestore_database ? 1 : 0
-  project      = var.project_id
-  name         = "firestore-release"
-  ruleset_name = google_firestore_ruleset.rules[0].name
-  depends_on   = [google_firestore_ruleset.rules]
-}
+# Note: Firestore security rules are managed separately via deployment or the Firebase Console.
+# The firestore.rules file can be deployed using the Firebase CLI:
+# firebase deploy --only firestore:rules
+# Uncomment the resource below if using a custom provider or if rules management is needed via Terraform.
+# For now, this is kept as documentation of the rules file location.
 
 # --- Service Account & IAM ---
 
@@ -165,7 +151,6 @@ resource "google_compute_instance" "default" {
   metadata_startup_script = templatefile("${path.module}/startup-script.sh.tpl", {
     gcs_bucket_name           = google_storage_bucket.backup_bucket[0].name,
     setup_scripts_tarball_md5 = data.archive_file.setup_scripts_archive.output_md5,
-
   })
 
   service_account {

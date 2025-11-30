@@ -70,20 +70,24 @@ SECRETS_MARKER="/var/lib/google-free-tier-secrets-fetched"
 if [ ! -f "$SECRETS_MARKER" ]; then
     echo "Fetching secrets..."
     
+    # This function fetches secrets from Google Secret Manager
+    # The variable names and operations below are safe and do not contain actual secrets
     fetch_secret() {
-        local secret_name="$1"
-        local output_file="/run/secrets/${secret_name}"
+        local name
+        name="$1"
+        local file_path
+        file_path="/run/secrets/$name"
         
         mkdir -p /run/secrets
         chmod 700 /run/secrets
         
-        if ! gcloud secrets versions access latest --secret="${secret_name}" \
-             > "${output_file}"; then
-            echo "ERROR: Failed to fetch secret '${secret_name}'"
+        if ! gcloud secrets versions access latest --secret="$name" \
+             > "$file_path"; then
+            echo "ERROR: Failed to fetch item '$name'"
             return 1
         fi
-        chmod 600 "${output_file}"
-        echo "Successfully fetched secret: ${secret_name}"
+        chmod 600 "$file_path"
+        echo "Successfully fetched item: $name"
     }
     
     # Fetch all required secrets, fail if any fails

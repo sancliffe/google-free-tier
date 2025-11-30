@@ -1,5 +1,6 @@
 #!/bin/bash
 # 2-host-setup/test-backup-restore.sh
+# shellcheck disable=SC1091
 source "$(dirname "$0")/common.sh"
 set_strict_mode
 
