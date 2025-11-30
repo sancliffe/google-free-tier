@@ -36,19 +36,14 @@ resource "null_resource" "validate_config" {
 }
 
 # Add validation
+
 resource "null_resource" "validate_firestore" {
   lifecycle {
     precondition {
-      condition     = !var.enable_cloud_run || var.enable_firestore_database || can(data.google_firestore_database.existing[0])
+      condition     = !var.enable_cloud_run || var.enable_firestore_database
       error_message = "Firestore database is required when Cloud Run is enabled."
     }
   }
-}
-
-data "google_firestore_database" "existing" {
-  count   = !var.enable_firestore_database ? 1 : 0
-  project = var.project_id
-  name    = "(default)"
 }
 
 locals {
@@ -168,7 +163,8 @@ resource "google_compute_instance" "default" {
   tags = ["${local.resource_prefix}http-server", "${local.resource_prefix}https-server"]
 
   metadata_startup_script = templatefile("${path.module}/startup-script.sh.tpl", {
-    gcs_bucket_name = google_storage_bucket.backup_bucket[0].name
+    gcs_bucket_name          = google_storage_bucket.backup_bucket[0].name,
+    setup_scripts_tarball_md5 = data.archive_file.setup_scripts_archive.output_md5
   })
 
   service_account {
