@@ -83,11 +83,22 @@ resource "google_app_engine_application" "app" {
   depends_on  = [google_project_service.appengine_api]
 }
 
+resource "google_project_iam_custom_role" "vm_stopper" {
+  role_id     = "vmStopper"
+  title       = "VM Instance Stopper"
+  description = "Can only stop specific VM instances"
+  permissions = [
+    "compute.instances.get",
+    "compute.instances.stop",
+    "compute.zones.get"
+  ]
+}
+
 # FIXED: Create IAM binding BEFORE the function to avoid race conditions
 resource "google_project_iam_member" "cost_killer_sa_compute" {
   count      = var.enable_vm ? 1 : 0
   project    = var.project_id
-  role       = "roles/compute.instanceAdmin.v1"
+  role       = "projects/${var.project_id}/roles/vmStopper"
   member     = "serviceAccount:${var.project_id}@appspot.gserviceaccount.com"
   depends_on = [google_app_engine_application.app[0]]
 }
@@ -109,13 +120,15 @@ resource "null_resource" "verify_iam" {
 
   provisioner "local-exec" {
     command = <<EOF
-for i in {1..30}; do
-  if gcloud projects get-iam-policy ${var.project_id} --format="json" | grep -q "serviceAccount:${var.project_id}@appspot.gserviceaccount.com"; then
-    echo "IAM policy for cost-killer successfully propagated."
+for i in {1..60}; do  # Increased from 30
+  if gcloud projects get-iam-policy ${var.project_id} \
+     --flatten="bindings[].members" \
+     --filter="bindings.role:projects/${var.project_id}/roles/vmStopper AND bindings.members:serviceAccount:${var.project_id}@appspot.gserviceaccount.com" \
+     --format="value(bindings.members)" | grep -q "${var.project_id}@appspot.gserviceaccount.com"; then
+    echo "IAM policy verified"
     exit 0
   fi
-  echo "Waiting for IAM propagation for cost-killer... (attempt $i/30)"
-  sleep 5
+  sleep 3
 done
 echo "Timed out waiting for IAM propagation for cost-killer."
 exit 1

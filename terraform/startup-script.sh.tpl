@@ -70,26 +70,28 @@ SECRETS_MARKER="/var/lib/google-free-tier-secrets-fetched"
 if [ ! -f "$SECRETS_MARKER" ]; then
     echo "Fetching secrets..."
     
-    # Helper function to safely fetch and export a secret as an environment variable
     fetch_secret() {
         local secret_name="$1"
-        local env_var_name="$2"
+        local output_file="/run/secrets/${secret_name}"
         
-        local secret_value
-        if ! secret_value=$(gcloud secrets versions access latest --secret="${secret_name}" --format="value(payload.data)" | base64 --decode); then
+        mkdir -p /run/secrets
+        chmod 700 /run/secrets
+        
+        if ! gcloud secrets versions access latest --secret="${secret_name}" \
+             > "${output_file}"; then
             echo "ERROR: Failed to fetch secret '${secret_name}'"
             return 1
         fi
-        export "${env_var_name}"="${secret_value}"
+        chmod 600 "${output_file}"
         echo "Successfully fetched secret: ${secret_name}"
     }
     
     # Fetch all required secrets, fail if any fails
-    fetch_secret "duckdns_token" "DD_AUTH_STRING" || exit 1
-    fetch_secret "email_address" "EMAIL_ADDRESS" || exit 1
-    fetch_secret "domain_name" "DOMAIN_NAME" || exit 1
-    fetch_secret "backup_dir" "BACKUP_DIR" || exit 1
-    fetch_secret "gcs_bucket_name" "GCS_BUCKET_NAME" || exit 1
+    fetch_secret "duckdns_token" || exit 1
+    fetch_secret "email_address" || exit 1
+    fetch_secret "domain_name" || exit 1
+    fetch_secret "backup_dir" || exit 1
+    fetch_secret "gcs_bucket_name" || exit 1
     
     touch "$SECRETS_MARKER"
     echo "All secrets fetched successfully."
@@ -103,7 +105,7 @@ DOWNLOAD_MARKER="/var/lib/google-free-tier-scripts-downloaded"
 if [ ! -f "$DOWNLOAD_MARKER" ]; then
     DOWNLOAD_DIR="/tmp/2-host-setup"
     TARBALL_PATH="$${DOWNLOAD_DIR}/setup-scripts.tar.gz"
-    REMOTE_TARBALL_PATH="gs://${gcs_bucket_name}/setup-scripts/setup-scripts.tar.gz"
+    REMOTE_TARBALL_PATH="gs://$(cat /run/secrets/gcs_bucket_name)/setup-scripts/setup-scripts.tar.gz"
     SETUP_SCRIPTS_MD5="$${setup_scripts_tarball_md5}" # Passed from Terraform
 
     echo "Attempting to download and verify setup scripts from GCS..."
@@ -195,13 +197,3 @@ echo "Running setup scripts..."
   echo "ERROR: Setup scripts failed. Check /var/log/startup-script.log"
   exit 1
 }
-
-# 4. Clean up secrets from environment
-echo "Cleaning up secrets from environment..."
-unset DD_AUTH_STRING
-unset EMAIL_ADDRESS
-unset DOMAIN_NAME
-unset BACKUP_DIR
-unset GCS_BUCKET_NAME
-
-echo "--- Startup Script Complete ---"

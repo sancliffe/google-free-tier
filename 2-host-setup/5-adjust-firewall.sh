@@ -9,6 +9,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=2-host-setup/common.sh
 source "${SCRIPT_DIR}/common.sh"
+set_strict_mode
 
 main() {
     log_info "--- Phase 5: Adjusting Local Firewall (UFW) ---"

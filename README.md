@@ -123,6 +123,11 @@ This verifies:
 - Necessary permissions are granted
 ```
 
+## Pre-Terraform Checklist
+- [ ] Run `bash scripts/validate-backend.sh` before any terraform command
+- [ ] Ensure `backend "gcs"` block is uncommented in `backend.tf`
+- [ ] Verify state bucket exists: `gsutil ls gs://PROJECT_ID-tfstate`
+
 **Estimated Time:** 
 - Manual VM setup: 30-45 minutes
 - Cloud Run deployment: 15-20 minutes (after Phase 1)

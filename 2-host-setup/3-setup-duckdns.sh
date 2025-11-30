@@ -6,6 +6,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=2-host-setup/common.sh
 source "${SCRIPT_DIR}/common.sh"
+set_strict_mode
 
 # --- Constants ---
 INSTALL_DIR="${HOME}/.duckdns"
@@ -16,20 +17,15 @@ LOG_FILE="${INSTALL_DIR}/duck.log"
 main() {
     log_info "--- Phase 3: Setting up DuckDNS ---"
 
-        # Read secrets from environment variables
-
-        local DOMAIN="${DOMAIN_NAME}"
-
-        local TOKEN="${DD_AUTH_STRING}"
-
-    
+        # Read secrets from files
+        local DOMAIN
+        DOMAIN=$(cat /run/secrets/domain_name)
+        local TOKEN
+        TOKEN=$(cat /run/secrets/duckdns_token)
 
         if [[ -z "${DOMAIN}" || -z "${TOKEN}" ]]; then
-
-            log_error "Required secrets (DOMAIN_NAME or DD_AUTH_STRING) not found in environment. Ensure startup script ran successfully."
-
+            log_error "Required secrets not found in /run/secrets. Ensure startup script ran successfully."
             exit 1
-
         fi
     log_info "Using credentials from environment."
 

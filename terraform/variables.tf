@@ -95,9 +95,9 @@ variable "enable_cloud_run_domain_mapping" {
 }
 
 variable "enable_firestore_database" {
-  description = "Enable the creation of the Firestore database. Set to false if you create it manually."
+  description = "Enable the creation of the Firestore database."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "enable_gke" {
@@ -110,6 +110,12 @@ variable "enable_gke" {
     - Not part of Always Free tier
     - Management fee is waived, but compute resources are billed
   EOT
+  type        = bool
+  default     = false
+}
+
+variable "enable_cloud_armor" {
+  description = "Enable the Cloud Armor security policy for the VM."
   type        = bool
   default     = false
 }
@@ -197,4 +203,10 @@ variable "nodejs_version" {
   description = "The Node.js runtime version for Cloud Functions. This value *must* align with the version specified in `app/.nvmrc`."
   type        = string
   default     = "20" # Default kept for manual Terraform runs, but should be overridden by CI/CD
+}
+
+variable "name_prefix" {
+  description = "Prefix for all resource names"
+  type        = string
+  default     = ""
 }

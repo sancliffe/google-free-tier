@@ -14,6 +14,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=2-host-setup/common.sh
 source "${SCRIPT_DIR}/common.sh"
+set_strict_mode
 
 create_optimized_nginx_config() {
     log_info "Applying Nginx performance optimizations for e2-micro..."

@@ -6,6 +6,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=2-host-setup/common.sh
 source "${SCRIPT_DIR}/common.sh"
+set_strict_mode
 
 # --- Constants ---
 BACKUP_SCRIPT_PATH="/usr/local/bin/backup-to-gcs.sh"
@@ -17,8 +18,10 @@ main() {
     log_info "--- Phase 6: Setting up Automated Backups ---"
     ensure_root || exit 1
 
-    local BUCKET_NAME="${GCS_BUCKET_NAME}"
-    local BACKUP_DIR="${BACKUP_DIR}"
+    local BUCKET_NAME
+    BUCKET_NAME=$(cat /run/secrets/gcs_bucket_name)
+    local BACKUP_DIR
+    BACKUP_DIR=$(cat /run/secrets/backup_dir)
 
     # Validate inputs
     if [[ -z "${BUCKET_NAME}" ]]; then
@@ -71,9 +74,9 @@ main() {
 #!/bin/bash
 set -euo pipefail
 
-# Configuration from environment or defaults
-BUCKET_NAME="${GCS_BUCKET_NAME:-}"
-BACKUP_DIR="${BACKUP_DIR:-}"
+# Configuration from files
+BUCKET_NAME=$(cat /run/secrets/gcs_bucket_name)
+BACKUP_DIR=$(cat /run/secrets/backup_dir)
 BACKUP_FILENAME="backup-$(date -u +"%Y-%m-%d-%H%M%S").tar.gz"
 TEMP_FILE=$(mktemp -t "${BACKUP_FILENAME}.XXXXXX")
 
@@ -180,8 +183,6 @@ EOF
     # Test the backup script
     log_info "Testing backup script..."
     if ! BACKUP_LOG_FILE="${BACKUP_LOG_DIR}/backup-test.log" \
-         GCS_BUCKET_NAME="${BUCKET_NAME}" \
-         BACKUP_DIR="${BACKUP_DIR}" \
          "${BACKUP_SCRIPT_PATH}"; then
         log_error "Backup test failed. Check gsutil authentication:"
         log_info "  👉 Run: gcloud auth application-default login"
@@ -192,7 +193,7 @@ EOF
     
     log_info "Setting up cron job to run at 3 AM daily..."
     local cron_log="${BACKUP_LOG_DIR}/backup.log"
-    local cron_cmd="0 3 * * * BUCKET_NAME='${BUCKET_NAME}' BACKUP_DIR='${BACKUP_DIR}' BACKUP_LOG_FILE='${cron_log}' ${BACKUP_SCRIPT_PATH} >> ${cron_log} 2>&1"
+    local cron_cmd="0 3 * * * BACKUP_LOG_FILE='${cron_log}' ${BACKUP_SCRIPT_PATH} >> ${cron_log} 2>&1"
     
     local temp_cron
     temp_cron=$(mktemp)

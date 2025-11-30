@@ -18,8 +18,16 @@ exports.checkBackups = async (req, res) => {
   }
 
   try {
-    const [files] = await storage.bucket(bucketName).getFiles({ prefix: backupPrefix });
-
+    const [files] = await storage.bucket(bucketName).getFiles({ 
+      prefix: backupPrefix,
+      maxResults: 1000  // Limit to prevent memory issues
+    });
+    
+    if (!files || files.length === 0) {
+      console.error(`No backup files found in gs://${bucketName}/${backupPrefix}`);
+      return res.status(500).send('No backups found in bucket.');
+    }
+    
     let latestBackupTimestamp = 0;
     files.forEach(file => {
       // Assuming backup files are named like 'backup-YYYY-MM-DD-HHMMSS.tar.gz'
@@ -53,7 +61,14 @@ exports.checkBackups = async (req, res) => {
       return res.status(200).send('Backups are healthy.');
     }
   } catch (err) {
-    console.error('Error checking backups:', err);
-    return res.status(500).send('Failed to check backups.');
+    console.error('Failed to access backup bucket:', err);
+    
+    if (err.code === 403) {
+      return res.status(500).send('Permission denied accessing backup bucket.');
+    } else if (err.code === 404) {
+      return res.status(500).send('Backup bucket not found.');
+    }
+    
+    return res.status(500).send(`Backup check failed: ${err.message}`);
   }
 };

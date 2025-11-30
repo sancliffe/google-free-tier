@@ -1,6 +1,6 @@
 # Use an official Node.js runtime as a parent image
 # Upgraded to 20-slim (Active LTS)
-ARG NODE_VERSION
+ARG NODE_VERSION=20
 FROM node:${NODE_VERSION}-slim
 
 # Set the working directory in the container

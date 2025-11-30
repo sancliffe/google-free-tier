@@ -7,18 +7,28 @@ const ASSETS_URL = process.env.ASSETS_URL || '';
 
 // Initialize Firestore with connection pooling for better performance
 const firestore = new Firestore({
-  // In a low-traffic app, 1 idle channel is sufficient.
-  maxIdleChannels: 1,
-  // Keep gRPC connections alive.
+  maxIdleChannels: 1,  // Good for low traffic
   keepAlive: true,
   grpc: {
-    'grpc.keepalive_time_ms': 30000,
-    'grpc.keepalive_timeout_ms': 5000,
+    'grpc.keepalive_time_ms': 120000,  // Increased from 30s
+    'grpc.keepalive_timeout_ms': 10000, // Increased from 5s
+    'grpc.initial_reconnect_backoff_ms': 1000,
+    'grpc.max_reconnect_backoff_ms': 10000,
   },
 });
 
 // Add comprehensive health check
+let lastHealthCheck = { timestamp: 0, result: null };
+const HEALTH_CHECK_CACHE_MS = 5000; // 5 seconds
+
 app.get('/healthz', async (req, res) => {
+  const now = Date.now();
+  
+  // Return cached result if recent
+  if (now - lastHealthCheck.timestamp < HEALTH_CHECK_CACHE_MS && lastHealthCheck.result) {
+    return res.status(lastHealthCheck.result.status).json(lastHealthCheck.result.data);
+  }
+  
   const checks = {
     firestore: false,
     memory: false,
@@ -39,18 +49,19 @@ app.get('/healthz', async (req, res) => {
     
     const healthy = Object.values(checks).every(v => v);
     
-    if (healthy) {
-      res.status(200).json({ status: 'healthy', checks });
-    } else {
-      res.status(503).json({ status: 'unhealthy', checks });
-    }
+    lastHealthCheck = {
+      timestamp: now,
+      result: { status: healthy ? 200 : 503, data: { status: healthy ? 'healthy' : 'unhealthy', checks } }
+    };
+    
+    res.status(lastHealthCheck.result.status).json(lastHealthCheck.result.data);
   } catch (err) {
     console.error('Health check failed:', err);
-    res.status(503).json({ 
-      status: 'unhealthy', 
-      checks,
-      error: err.message 
-    });
+    lastHealthCheck = {
+      timestamp: now,
+      result: { status: 503, data: { status: 'unhealthy', checks, error: err.message } }
+    };
+    res.status(503).json(lastHealthCheck.result.data);
   }
 });
 
@@ -101,15 +112,21 @@ const server = app.listen(PORT, () => {
 
 // Implement graceful shutdown
 const gracefulShutdown = () => {
+  // GKE termination grace period is 30s by default
+  // We give 25s for graceful shutdown to allow 5s buffer
+  let SHUTDOWN_TIMEOUT = parseInt(process.env.SHUTDOWN_TIMEOUT || '25000', 10);
+
+  if (isNaN(SHUTDOWN_TIMEOUT) || SHUTDOWN_TIMEOUT <= 0) {
+    console.error('Invalid SHUTDOWN_TIMEOUT, using default 25000ms');
+    SHUTDOWN_TIMEOUT = 25000;
+  }
+
   console.log('Received kill signal, shutting down gracefully.');
   server.close(() => {
     console.log('Closed out remaining connections.');
     process.exit(0);
   });
 
-  // GKE has a default termination grace period of 30 seconds.
-  // We give the server 25 seconds to shut down gracefully.
-  const SHUTDOWN_TIMEOUT = process.env.SHUTDOWN_TIMEOUT || 25000;
   setTimeout(() => {
     console.error('Could not close connections in time, forcefully shutting down');
     process.exit(1);

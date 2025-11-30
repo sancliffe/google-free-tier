@@ -6,6 +6,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=2-host-setup/common.sh
 source "${SCRIPT_DIR}/common.sh"
+set_strict_mode
 
 # --- DNS Pre-flight Check ---
 check_dns() {
@@ -55,11 +56,13 @@ main() {
     log_info "--- Phase 4: Setting up SSL with Let's Encrypt ---"
     ensure_root || exit 1
 
-    local DOMAIN="${DOMAIN_NAME}"
-    local EMAIL="${EMAIL_ADDRESS}"
+    local DOMAIN
+    DOMAIN=$(cat /run/secrets/domain_name)
+    local EMAIL
+    EMAIL=$(cat /run/secrets/email_address)
 
     if [[ -z "${DOMAIN}" || -z "${EMAIL}" ]]; then
-        log_error "Required secrets (DOMAIN_NAME or EMAIL_ADDRESS) not found in environment. Ensure startup script ran successfully."
+        log_error "Required secrets not found in /run/secrets. Ensure startup script ran successfully."
         exit 1
     else
         log_info "Using domain: ${DOMAIN}"

@@ -11,8 +11,10 @@ service cloud.firestore {
     // This allows the front-end to read the visitor count without authentication.
     // The server-side code (Cloud Run/GKE) will have privileged access to write.
     match /visits/{visit} {
-      allow read: if request.time < timestamp.date(2026, 1, 1);
-      allow write: if false; // Disallow client-side writes entirely
-    }
+  // Only allow reading the counter document, not creating new ones
+  allow read: if visit == 'counter' && 
+                 request.time < timestamp.date(2026, 6, 1);
+  allow write: if false;
+}
   }
 }

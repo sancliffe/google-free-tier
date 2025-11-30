@@ -6,6 +6,13 @@
 # --- Strict Mode ---
 set -euo pipefail
 
+set_strict_mode() {
+    set -euo pipefail
+    if [[ "${TRACE:-0}" == "1" ]]; then
+        set -x
+    fi
+}
+
 # --- Log Formatting ---
 #
 # Usage:

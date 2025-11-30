@@ -35,8 +35,25 @@ resource "null_resource" "validate_config" {
   }
 }
 
+# Add validation
+resource "null_resource" "validate_firestore" {
+  lifecycle {
+    precondition {
+      condition     = !var.enable_cloud_run || var.enable_firestore_database || can(data.google_firestore_database.existing[0])
+      error_message = "Firestore database is required when Cloud Run is enabled."
+    }
+  }
+}
+
+data "google_firestore_database" "existing" {
+  count   = !var.enable_firestore_database ? 1 : 0
+  project = var.project_id
+  name    = "(default)"
+}
+
 locals {
   environment = terraform.workspace
+  resource_prefix = var.name_prefix != "" ? "${var.name_prefix}-" : ""
 
   # Environment-specific overrides
   config = {
@@ -100,8 +117,8 @@ resource "google_firestore_release" "release" {
 
 resource "google_service_account" "vm_sa" {
   count        = var.enable_vm ? 1 : 0
-  account_id   = "free-tier-vm-sa"
-  display_name = "Free Tier VM Service Account"
+  account_id   = "${local.resource_prefix}free-tier-vm-sa"
+  display_name = "${local.resource_prefix}Free Tier VM Service Account"
 }
 
 resource "google_project_iam_member" "log_writer" {
@@ -129,7 +146,7 @@ resource "google_project_iam_member" "secret_accessor" {
 
 resource "google_compute_instance" "default" {
   count        = var.enable_vm ? 1 : 0
-  name         = "free-tier-vm"
+  name         = "${local.resource_prefix}free-tier-vm"
   machine_type = var.machine_type
   zone         = var.zone
 
@@ -148,7 +165,7 @@ resource "google_compute_instance" "default" {
     }
   }
 
-  tags = ["http-server", "https-server"]
+  tags = ["${local.resource_prefix}http-server", "${local.resource_prefix}https-server"]
 
   metadata_startup_script = templatefile("${path.module}/startup-script.sh.tpl", {
     gcs_bucket_name = google_storage_bucket.backup_bucket[0].name
@@ -172,7 +189,7 @@ resource "google_compute_firewall" "allow_http_https" {
   # Note: 0.0.0.0/0 is necessary for public web access.
   # For production environments, consider adding Cloud Armor for DDoS protection and rate limiting.
   count   = var.enable_vm ? 1 : 0
-  name    = "allow-http-https"
+  name    = "${local.resource_prefix}allow-http-https"
   network = "default"
 
   allow {
@@ -180,8 +197,32 @@ resource "google_compute_firewall" "allow_http_https" {
     ports    = ["80", "443"]
   }
 
-  target_tags   = ["http-server", "https-server"]
+  target_tags   = ["${local.resource_prefix}http-server", "${local.resource_prefix}https-server"]
   source_ranges = ["0.0.0.0/0"]
+}
+
+resource "google_compute_security_policy" "policy" {
+  count = var.enable_vm && var.enable_cloud_armor ? 1 : 0
+  name  = "${local.resource_prefix}vm-security-policy"
+
+  rule {
+    action   = "rate_based_ban"
+    priority = "1000"
+    match {
+      versioned_expr = "SRC_IPS_V1"
+      config {
+        src_ip_ranges = ["*"]
+      }
+    }
+    rate_limit_options {
+      conform_action = "allow"
+      exceed_action  = "deny(429)"
+      rate_limit_threshold {
+        count        = 100
+        interval_sec = 60
+      }
+    }
+  }
 }
 
 
@@ -189,7 +230,7 @@ resource "google_compute_firewall" "allow_http_https" {
 # --- VM Health Check ---
 resource "google_compute_health_check" "vm_health" {
   count = var.enable_vm ? 1 : 0
-  name  = "vm-health-check"
+  name  = "${local.resource_prefix}vm-health-check"
 
   tcp_health_check {
     port = "80"
@@ -200,7 +241,7 @@ resource "google_compute_health_check" "vm_health" {
 
 resource "google_storage_bucket" "backup_bucket" {
   count                       = var.enable_vm ? 1 : 0
-  name                        = var.gcs_bucket_name
+  name                        = "${local.resource_prefix}${var.gcs_bucket_name}"
   location                    = var.region
   force_destroy               = false
   uniform_bucket_level_access = true
@@ -243,7 +284,7 @@ resource "google_storage_bucket_object" "setup_scripts_tarball" {
 
 resource "google_storage_bucket" "assets_bucket" {
   count                       = var.assets_bucket_name != "" ? 1 : 0
-  name                        = var.assets_bucket_name
+  name                        = "${local.resource_prefix}${var.assets_bucket_name}"
   location                    = var.region
   uniform_bucket_level_access = true
   force_destroy               = true # CAUTION: Deletes bucket even if it has files
@@ -297,7 +338,7 @@ resource "google_storage_bucket_object" "demo_asset" {
 
 resource "google_monitoring_notification_channel" "email" {
   count        = var.enable_vm ? 1 : 0
-  display_name = "Admin On-Call"
+  display_name = "${local.resource_prefix}Admin On-Call"
   type         = "email"
   labels = {
     email_address = var.email_address
@@ -306,7 +347,7 @@ resource "google_monitoring_notification_channel" "email" {
 
 resource "google_monitoring_uptime_check_config" "http" {
   count        = var.enable_vm ? 1 : 0
-  display_name = "Uptime check for ${var.domain_name}"
+  display_name = "${local.resource_prefix}Uptime check for ${var.domain_name}"
   timeout      = "10s"
   period       = "60s"
   http_check {
@@ -324,7 +365,7 @@ resource "google_monitoring_uptime_check_config" "http" {
 
 resource "google_monitoring_alert_policy" "default" {
   count        = var.enable_vm ? 1 : 0
-  display_name = "[${var.domain_name}] Site Down"
+  display_name = "[${local.resource_prefix}${var.domain_name}] Site Down"
   combiner     = "OR"
   notification_channels = [
     google_monitoring_notification_channel.email[0].name,

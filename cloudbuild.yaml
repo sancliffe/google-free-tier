@@ -4,6 +4,18 @@ options:
   machineType: 'E2_HIGHCPU_8'  # Faster builds
 
 steps:
+- name: 'gcr.io/cloud-builders/gcloud'
+  entrypoint: 'bash'
+  args:
+    - '-c'
+    - |
+      if [[ -z "${PROJECT_ID}" ]] || [[ -z "${_REGION}" ]]; then
+        echo "ERROR: Required substitutions missing"
+        exit 1
+      fi
+      echo "✓ Configuration validated"
+- name: 'bash'
+  args: ['scripts/check-node-version.sh']
 # 1. Lint shell scripts
 - name: 'koalaman/shellcheck-alpine'
   args: 
@@ -26,16 +38,15 @@ steps:
 
 # 3. Build Docker
 - name: 'gcr.io/cloud-builders/docker'
-  env: ['DOCKER_BUILDKIT=1']
+  entrypoint: 'bash'
   args:
-    - 'build'
-    - '--build-arg'
-    - 'NODE_VERSION=$(cat app/.nvmrc)' # Pass Node.js version from .nvmrc to Dockerfile
-    - '-t'
-    - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/hello-app:${SHORT_SHA}'
-    - '-t'
-    - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/hello-app:latest'
-    - './app'
+    - '-c'
+    - |
+      NODE_VERSION=$(cat app/.nvmrc)
+      docker build --build-arg NODE_VERSION=$$NODE_VERSION \
+        -t ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/hello-app:${SHORT_SHA} \
+        -t ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/hello-app:latest \
+        ./app
 
 # 4. Push Docker
 - name: 'gcr.io/cloud-builders/docker'
