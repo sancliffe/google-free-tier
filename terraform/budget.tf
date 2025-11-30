@@ -212,8 +212,8 @@ resource "google_cloudfunctions_function" "backup_monitor" {
   service_account_email = google_service_account.backup_monitor_sa[0].email
 
   environment_variables = {
-    BACKUP_BUCKET_NAME   = google_storage_bucket.backup_bucket[0].name
-    BACKUP_PREFIX        = "backup-" # This matches the backup script's naming convention
+    BACKUP_BUCKET_NAME     = google_storage_bucket.backup_bucket[0].name
+    BACKUP_PREFIX          = "backup-" # This matches the backup script's naming convention
     BACKUP_THRESHOLD_HOURS = var.backup_threshold_hours
   }
 

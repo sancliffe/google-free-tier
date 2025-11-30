@@ -52,7 +52,7 @@ data "google_firestore_database" "existing" {
 }
 
 locals {
-  environment = terraform.workspace
+  environment     = terraform.workspace
   resource_prefix = var.name_prefix != "" ? "${var.name_prefix}-" : ""
 
   # Environment-specific overrides
