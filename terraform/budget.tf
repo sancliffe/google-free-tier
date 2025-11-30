@@ -92,14 +92,35 @@ resource "google_project_iam_member" "cost_killer_sa_compute" {
   depends_on = [google_app_engine_application.app[0]]
 }
 
-# This time_sleep is a workaround for IAM propagation delays.
-# A fixed sleep is fragile; ideally, the consuming Cloud Function (cost-killer)
-# should implement exponential backoff when calling GCP APIs that rely on
-# these permissions.
-resource "time_sleep" "wait_for_iam" {
-  count           = var.enable_vm ? 1 : 0
-  depends_on      = [google_project_iam_member.cost_killer_sa_compute]
-  create_duration = "60s"
+resource "google_project_iam_member" "cost_killer_sa_datastore" {
+  count      = var.enable_vm ? 1 : 0
+  project    = var.project_id
+  role       = "roles/datastore.user"
+  member     = "serviceAccount:${var.project_id}@appspot.gserviceaccount.com"
+  depends_on = [google_app_engine_application.app[0]]
+}
+
+# This null_resource is a more robust way to handle IAM propagation delays.
+# It uses a local-exec provisioner to poll the IAM policy until the new
+# member is present, with a timeout. This is more reliable than a fixed sleep.
+resource "null_resource" "verify_iam" {
+  count      = var.enable_vm ? 1 : 0
+  depends_on = [google_project_iam_member.cost_killer_sa_compute, google_project_iam_member.cost_killer_sa_datastore]
+
+  provisioner "local-exec" {
+    command = <<EOF
+for i in {1..30}; do
+  if gcloud projects get-iam-policy ${var.project_id} --format="json" | grep -q "serviceAccount:${var.project_id}@appspot.gserviceaccount.com"; then
+    echo "IAM policy for cost-killer successfully propagated."
+    exit 0
+  fi
+  echo "Waiting for IAM propagation for cost-killer... (attempt $i/30)"
+  sleep 5
+done
+echo "Timed out waiting for IAM propagation for cost-killer."
+exit 1
+EOF
+  }
 }
 
 resource "google_cloudfunctions_function" "cost_killer" {
@@ -128,8 +149,7 @@ resource "google_cloudfunctions_function" "cost_killer" {
   # Ensure APIs and IAM permissions are ready before creating the function
   depends_on = [
     google_project_service.billing_apis,
-    google_project_iam_member.cost_killer_sa_compute,
-    time_sleep.wait_for_iam[0]
+    null_resource.verify_iam[0]
   ]
 }
 
@@ -179,8 +199,9 @@ resource "google_cloudfunctions_function" "backup_monitor" {
   service_account_email = google_service_account.backup_monitor_sa[0].email
 
   environment_variables = {
-    BACKUP_BUCKET_NAME = google_storage_bucket.backup_bucket[0].name
-    BACKUP_PREFIX      = "backup-" # This matches the backup script's naming convention
+    BACKUP_BUCKET_NAME   = google_storage_bucket.backup_bucket[0].name
+    BACKUP_PREFIX        = "backup-" # This matches the backup script's naming convention
+    BACKUP_THRESHOLD_HOURS = var.backup_threshold_hours
   }
 
   depends_on = [

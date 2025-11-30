@@ -61,11 +61,12 @@ Before starting, ensure you have the following installed on your **local machine
 **Resources That May Incur Costs:**
 - **GKE Autopilot:** While there's no cluster management fee, you pay for the compute resources (vCPU/RAM) your pods use (~$20-30/month for a basic deployment)
 - **Cloud Storage:** Storage beyond 5GB per month
-- **Network Egress:** Traffic beyond 1GB per month from North America
-⚠️ **BANDWIDTH WARNING:** Free tier includes only 1GB/month network egress.
-- Each page visit with images could use 1-5MB
-- 1GB = ~200-1000 page views depending on content
-- Exceeding this limit will incur charges (~$0.12/GB)
+- **Network Egress:** 
+⚠️ **NETWORK EGRESS WARNING:**
+- Free tier: 1GB/month from North America only (excluding China/Australia)
+- Premium tier egress is charged
+- **Static external IPs on stopped VMs incur charges (~$3/month)**
+- Consider using standard tier networking for cost savings
 - **Cloud Functions:** Invocations beyond free tier limits (used by the Cost Killer function)
 - **External IP Addresses:** While an external IP for a running `e2-micro` VM is often free, a static external IP address *retained* for a *stopped* VM instance will incur charges. **Always release unused static external IP addresses to prevent unexpected costs.**
 
@@ -107,6 +108,19 @@ chmod +x 1-gcp-setup/*.sh 2-host-setup/*.sh 3-cloud-run-deployment/*.sh 3-gke-de
 # - Cloud Run: Jump to Phase 3 after Phase 1
 # - Kubernetes: Jump to Phase 4 after Phase 1
 # - Full IaC: Jump to Phase 5 after Phase 1
+
+### Before You Begin
+
+Run the prerequisites check:
+```bash
+bash scripts/check-prerequisites.sh
+```
+
+This verifies:
+- gcloud CLI is installed and authenticated
+- Required APIs are enabled
+- Billing is active
+- Necessary permissions are granted
 ```
 
 **Estimated Time:** 
@@ -459,9 +473,19 @@ Visit the URL in your browser to see your application running and the visitor co
 
 ## Phase 4: ☸️ GKE Autopilot Deployment (Kubernetes)
 
-Deploy the same Firestore-connected Node.js application to GKE Autopilot.
+## ⚠️ **CRITICAL COST WARNING FOR GKE**
 
-⚠️ **Cost Warning:** While GKE Autopilot eliminates the cluster management fee, the compute resources (vCPU/RAM) used by your pods are billed. A basic deployment typically costs $20-30/month.
+**GKE Autopilot is NOT FREE**. You will incur charges of approximately **$20-30/month** even with a single pod using minimal resources.
+
+| Cost Component | Monthly Cost |
+|----------------|--------------|
+| vCPU (250m) | ~$15 |
+| Memory (512Mi) | ~$10 |
+| **Total** | **~$25/month** |
+
+This is NOT covered by the free tier. Proceed only if you understand these costs.
+
+Deploy the same Firestore-connected Node.js application to GKE Autopilot.
 
 ### Prerequisites
 - Docker installed
@@ -895,6 +919,17 @@ Note: If you use `core.hooksPath`, ensure the scripts inside `.git-hooks` are ex
 | Terraform locked | Run: `terraform force-unlock LOCK_ID` | Phase 5 |
 
 ---
+
+### Common Terraform Errors
+
+**Error: "Error creating Instance: googleapi: Error 403: Compute Engine API has not been used"**
+- Solution: `gcloud services enable compute.googleapis.com`
+
+**Error: "Backend configuration changed"**
+- Solution: `terraform init -reconfigure`
+
+**Error: "Resource already exists"**
+- Solution: `terraform import google_compute_instance.default PROJECT/ZONE/INSTANCE_NAME`
 
 ### Common Issues
 

@@ -16,16 +16,22 @@ LOG_FILE="${INSTALL_DIR}/duck.log"
 main() {
     log_info "--- Phase 3: Setting up DuckDNS ---"
 
-    # Read secrets from files
-    local CREDENTIALS_DIR="/root/.credentials"
-    DOMAIN="$(cat ${CREDENTIALS_DIR}/domain_name)"
-    TOKEN="$(cat ${CREDENTIALS_DIR}/duckdns_token)"
+        # Read secrets from environment variables
 
-    if [[ -z "${DOMAIN}" || -z "${TOKEN}" ]]; then
-        log_error "Required secrets (DOMAIN or TOKEN) not found in ${CREDENTIALS_DIR}. Ensure startup script ran successfully."
-        exit 1
-    fi
-    log_info "Using credentials from ${CREDENTIALS_DIR}."
+        local DOMAIN="${DOMAIN_NAME}"
+
+        local TOKEN="${DD_AUTH_STRING}"
+
+    
+
+        if [[ -z "${DOMAIN}" || -z "${TOKEN}" ]]; then
+
+            log_error "Required secrets (DOMAIN_NAME or DD_AUTH_STRING) not found in environment. Ensure startup script ran successfully."
+
+            exit 1
+
+        fi
+    log_info "Using credentials from environment."
 
     log_info "Creating installation directory at ${INSTALL_DIR}..."
     mkdir -p "${INSTALL_DIR}"
@@ -38,20 +44,23 @@ main() {
 # Auto-generated DuckDNS update script
 # Logs to: ${LOG_FILE}
 
-DIR="\$(cd "\$(dirname "\$0")" && pwd)"
-LOG_FILE="\${DIR}/duck.log"
+# This script is called by cron with the domain and token as arguments
 
-# Read token directly from the secure credentials directory
-TOKEN="\$(cat ${CREDENTIALS_DIR}/duckdns_token)"
-DOMAIN_FROM_FILE="\$(cat ${CREDENTIALS_DIR}/domain_name)" # Also read domain from file for consistency
+if [[ \$# -ne 2 ]]; then
+    echo "Usage: \$0 <domain> <token>"
+    exit 1
+fi
 
-RESPONSE="\$(curl -s "https://www.duckdns.org/update?domains=\${DOMAIN_FROM_FILE}&token=\${TOKEN}&ip=")"
+DOMAIN="\$1"
+TOKEN="\$2"
+
+RESPONSE="\$(curl -s "https://www.duckdns.org/update?domains=\${DOMAIN}&token=\${TOKEN}&ip=")"
 
 if [[ "\$RESPONSE" == "OK" ]]; then
-    echo "\$(date -u +"%Y-%m-%dT%H:%M:%SZ") [OK] DuckDNS update successful: \$RESPONSE" >> "\${LOG_FILE}"
+    echo "\$(date -u +"%Y-%m-%dT%H:%M:%SZ") [OK] DuckDNS update successful: \$RESPONSE" >> "${LOG_FILE}"
     exit 0
 else
-    echo "\$(date -u +"%Y-%m-%dT%H:%M:%SZ") [ERROR] DuckDNS update failed: \$RESPONSE" >> "\${LOG_FILE}"
+    echo "\$(date -u +"%Y-%m-%dT%H:%M:%SZ") [ERROR] DuckDNS update failed: \$RESPONSE" >> "${LOG_FILE}"
     exit 1
 fi
 EOF
@@ -60,11 +69,11 @@ EOF
     chmod 700 "${SCRIPT_FILE}"
 
     log_info "Running initial test..."
-    if "${SCRIPT_FILE}"; then
+    if "${SCRIPT_FILE}" "${DOMAIN}" "${TOKEN}"; then
         log_success "DuckDNS initial update successful."
         log_info "Setting up cron job to run every 5 minutes..."
         
-        CRON_CMD="*/5 * * * * ${SCRIPT_FILE} >> ${LOG_FILE} 2>&1"
+        CRON_CMD="*/5 * * * * ${SCRIPT_FILE} '${DOMAIN}' '${TOKEN}' >> ${LOG_FILE} 2>&1"
         # Safer cron manipulation
         (crontab -l 2>/dev/null | grep -vF "${SCRIPT_FILE}"; echo "${CRON_CMD}") | crontab -
 

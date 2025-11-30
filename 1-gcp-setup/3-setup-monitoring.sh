@@ -44,6 +44,10 @@ main() {
 
     local email
     read -r -p "Enter the email address for alert notifications: " email
+    if ! [[ "$email" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+        log_error "Invalid email format"
+        exit 1
+    fi
 
     local display_name
     read -r -p "Enter a display name for this notification channel (e.g., 'Admin On-Call'): " display_name

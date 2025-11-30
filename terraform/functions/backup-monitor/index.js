@@ -41,8 +41,12 @@ exports.checkBackups = async (req, res) => {
 
     const hoursSinceBackup = (Date.now() - latestBackupTimestamp) / 3600000;
     
-    if (hoursSinceBackup > 25) {
-      console.error(`Backup is overdue! Last backup was ${hoursSinceBackup.toFixed(2)} hours ago.`);
+    // Default to 25 hours, but allow override via environment variable
+    const thresholdHours = parseInt(process.env.BACKUP_THRESHOLD_HOURS, 10) || 25;
+
+    if (hoursSinceBackup > thresholdHours) {
+      console.error(`Backup is overdue! Last backup was ${hoursSinceBackup.toFixed(2)} hours ago (threshold: ${thresholdHours}h).`);
+      // Returning 500 will trigger a GCP Monitoring alert if configured.
       return res.status(500).send('Backup is overdue!');
     } else {
       console.log(`Backups are healthy. Last backup was ${hoursSinceBackup.toFixed(2)} hours ago.`);

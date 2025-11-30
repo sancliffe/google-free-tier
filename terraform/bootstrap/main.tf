@@ -45,6 +45,15 @@ resource "google_storage_bucket" "tfstate" {
     enabled = true
   }
 
+  lifecycle_rule {
+    condition {
+      num_newer_versions = 5
+    }
+    action {
+      type = "Delete"
+    }
+  }
+
   encryption {
     default_kms_key_name = google_kms_crypto_key.terraform_state_bucket.id
   }

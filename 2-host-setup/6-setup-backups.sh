@@ -17,20 +17,17 @@ main() {
     log_info "--- Phase 6: Setting up Automated Backups ---"
     ensure_root || exit 1
 
-    local CREDENTIALS_DIR="/root/.credentials"
-    local BUCKET_NAME
-    BUCKET_NAME="$(cat "${CREDENTIALS_DIR}/gcs_bucket_name")"
-    local BACKUP_DIR
-    BACKUP_DIR="$(cat "${CREDENTIALS_DIR}/backup_dir")"
+    local BUCKET_NAME="${GCS_BUCKET_NAME}"
+    local BACKUP_DIR="${BACKUP_DIR}"
 
     # Validate inputs
     if [[ -z "${BUCKET_NAME}" ]]; then
-        log_error "Bucket name is empty. Ensure 'gcs_bucket_name' is set in Secret Manager and startup script ran successfully."
+        log_error "Bucket name is empty. Ensure 'GCS_BUCKET_NAME' is set as an environment variable."
         exit 1
     fi
 
     if [[ -z "${BACKUP_DIR}" ]]; then
-        log_error "Backup directory not specified. Ensure 'backup_dir' is set in Secret Manager and startup script ran successfully."
+        log_error "Backup directory not specified. Ensure 'BACKUP_DIR' is set as an environment variable."
         exit 1
     fi
 
@@ -91,6 +88,35 @@ error_exit() {
     exit 1
 }
 
+test_backup_restoration() {
+    log "--- Starting periodic backup restoration test ---"
+    local test_dir
+    test_dir=$(mktemp -d)
+    
+    log "Downloading latest backup to ${test_dir}..."
+    if ! gsutil cp "gs://${BUCKET_NAME}/${BACKUP_FILENAME}" "${test_dir}/"; then
+        log "Restoration test failed: Could not download backup file."
+        # This is not a fatal error for the main backup script, so we don't exit.
+        return 1
+    fi
+    
+    log "Extracting backup..."
+    if ! tar -xzf "${test_dir}/${BACKUP_FILENAME}" -C "${test_dir}"; then
+        log "Restoration test failed: Could not extract backup file."
+        return 1
+    }
+    
+    # Check if the backed up directory exists after extraction
+    if [[ ! -d "${test_dir}/$(basename "${BACKUP_DIR}")" ]]; then
+        log "Restoration test failed: Backed up directory not found in archive."
+        return 1
+    }
+    
+    log "✅ Restoration test passed. Backup is valid."
+    rm -rf "${test_dir}"
+    log "--- Restoration test finished ---"
+}
+
 log "=== Backup started ==="
 log "Source: ${BACKUP_DIR}"
 log "Destination: gs://${BUCKET_NAME}/"
@@ -116,6 +142,12 @@ if [[ ! -s "${TEMP_FILE}" ]]; then
     error_exit "Archive file is empty or missing"
 fi
 
+log "Verifying archive integrity..."
+if ! tar -tzf "${TEMP_FILE}" &> /dev/null; then
+    error_exit "Archive integrity verification failed. The created tarball is corrupt."
+fi
+log "Archive integrity verified."
+
 FILE_SIZE=$(stat -c%s "${TEMP_FILE}" 2>/dev/null || stat -f%z "${TEMP_FILE}" 2>/dev/null || echo "unknown")
 log "Archive created successfully. Size: ${FILE_SIZE} bytes"
 
@@ -128,11 +160,16 @@ log "Upload complete. Verifying..."
 if gsutil ls "gs://${BUCKET_NAME}/${BACKUP_FILENAME}" > /dev/null; then
     log "✅ Backup verified successfully at gs://${BUCKET_NAME}/${BACKUP_FILENAME}"
 else
-    error_exit "Backup verification failed"
+    error_exit "Upload verification failed"
 fi
 
 # Cleanup local temp file
 rm -f "${TEMP_FILE}"
+
+# Run restoration test on the first day of the week (Monday)
+if [[ "$(date +%u)" -eq 1 ]]; then
+    test_backup_restoration
+fi
 
 log "=== Backup completed successfully ==="
 EOF

@@ -5,8 +5,17 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const ASSETS_URL = process.env.ASSETS_URL || '';
 
-// Initialize Firestore
-const firestore = new Firestore();
+// Initialize Firestore with connection pooling for better performance
+const firestore = new Firestore({
+  // In a low-traffic app, 1 idle channel is sufficient.
+  maxIdleChannels: 1,
+  // Keep gRPC connections alive.
+  keepAlive: true,
+  grpc: {
+    'grpc.keepalive_time_ms': 30000,
+    'grpc.keepalive_timeout_ms': 5000,
+  },
+});
 
 // Add comprehensive health check
 app.get('/healthz', async (req, res) => {
@@ -98,10 +107,13 @@ const gracefulShutdown = () => {
     process.exit(0);
   });
 
+  // GKE has a default termination grace period of 30 seconds.
+  // We give the server 25 seconds to shut down gracefully.
+  const SHUTDOWN_TIMEOUT = process.env.SHUTDOWN_TIMEOUT || 25000;
   setTimeout(() => {
     console.error('Could not close connections in time, forcefully shutting down');
     process.exit(1);
-  }, 5000); // Reduce to 5000ms for faster restarts.
+  }, SHUTDOWN_TIMEOUT);
 };
 
 process.on('SIGTERM', gracefulShutdown);

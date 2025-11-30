@@ -75,6 +75,27 @@ resource "google_firestore_database" "database" {
   depends_on = [google_project_service.firestore]
 }
 
+# Deploy Firestore security rules
+resource "google_firestore_ruleset" "rules" {
+  count   = var.enable_firestore_database ? 1 : 0
+  project = var.project_id
+  source {
+    files {
+      name    = "firestore.rules"
+      content = file("${path.module}/firestore.rules")
+    }
+  }
+  depends_on = [google_firestore_database.database]
+}
+
+resource "google_firestore_release" "release" {
+  count        = var.enable_firestore_database ? 1 : 0
+  project      = var.project_id
+  name         = "firestore-release"
+  ruleset_name = google_firestore_ruleset.rules[0].name
+  depends_on   = [google_firestore_ruleset.rules]
+}
+
 # --- Service Account & IAM ---
 
 resource "google_service_account" "vm_sa" {
@@ -163,19 +184,7 @@ resource "google_compute_firewall" "allow_http_https" {
   source_ranges = ["0.0.0.0/0"]
 }
 
-resource "google_compute_firewall" "allow_ssh_iap" {
-  count   = var.enable_vm ? 1 : 0
-  name    = "allow-ssh-from-iap"
-  network = "default"
 
-  allow {
-    protocol = "tcp"
-    ports    = ["22"]
-  }
-
-  target_tags   = ["http-server", "https-server"]
-  source_ranges = ["35.235.240.0/20"]
-}
 
 # --- VM Health Check ---
 resource "google_compute_health_check" "vm_health" {

@@ -15,6 +15,73 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=2-host-setup/common.sh
 source "${SCRIPT_DIR}/common.sh"
 
+create_optimized_nginx_config() {
+    log_info "Applying Nginx performance optimizations for e2-micro..."
+    
+    local config_file="/etc/nginx/conf.d/e2-micro-optimizations.conf"
+    
+    # backup_file is from common.sh
+    backup_file "$config_file" "/etc/nginx/conf.d"
+    
+    cat <<'EOF' > "$config_file"
+# Custom optimizations for e2-micro instances.
+# These values are tuned for a low-memory, shared-CPU environment.
+
+# e2-micro has 2 vCPUs, but they are shared-core. 
+# 1 worker process is a safe default to conserve memory.
+worker_processes 1;
+
+events {
+    # Lower the number of connections per worker. Default is 768 on Debian.
+    # 512 is a conservative value for a 1GB RAM instance.
+    worker_connections 512;
+}
+
+# Shorter timeouts to free up worker connections faster, reducing memory usage.
+keepalive_timeout 20s;
+client_body_timeout 15s;
+client_header_timeout 15s;
+send_timeout 15s;
+
+# Disable access logging to reduce disk I/O, which can be slow on standard disks.
+# Error logs are still enabled by default in nginx.conf.
+access_log off;
+
+# Gzip compression is a trade-off between CPU and bandwidth.
+# Enable for text-based assets, but use a moderate compression level.
+gzip on;
+gzip_vary on;
+gzip_proxied any;
+gzip_comp_level 4; # Lower level to reduce CPU usage
+gzip_min_length 256;
+gzip_types
+    application/atom+xml
+    application/geo+json
+    application/javascript
+    application/x-javascript
+    application/json
+    application/ld+json
+    application/manifest+json
+    application/rdf+xml
+    application/rss+xml
+    application/vnd.ms-fontobject
+    application/wasm
+    application/x-web-app-manifest+json
+    application/xhtml+xml
+    application/xml
+    font/eot
+    font/otf
+    font/ttf
+    image/svg+xml
+    text/css
+    text/javascript
+    text/plain
+    text/xml;
+EOF
+
+    log_success "Nginx optimization config created at $config_file."
+}
+
 # --- Main Logic ---
 main() {
     log_info "--- Phase 2: Installing Nginx ---"
@@ -49,6 +116,9 @@ main() {
         log_success "Nginx installed successfully."
     fi
 
+    # Apply performance optimizations for e2-micro
+    create_optimized_nginx_config
+
     log_info "Ensuring Nginx is enabled to start on boot..."
     # `systemctl enable` is idempotent. It will only create the link if it doesn't exist.
     if ! systemctl enable nginx; then
@@ -56,9 +126,9 @@ main() {
         exit 1
     fi
 
-    log_info "Starting Nginx service..."
-    if ! systemctl start nginx; then
-        log_error "Failed to start Nginx."
+    log_info "Starting/reloading Nginx service..."
+    if ! systemctl reload-or-restart nginx; then
+        log_error "Failed to start or reload Nginx."
         exit 1
     fi
 
@@ -71,6 +141,30 @@ main() {
         log_info "👉 Try running: sudo journalctl -u nginx -n 50"
         exit 1
     fi
+    
+    log_info "Performing health check on Nginx..."
+    # Ensure curl is installed for the health check
+    if ! command -v curl &> /dev/null; then
+        log_warn "curl not found, installing for health check..."
+        apt-get install -y -qq curl || { log_error "Failed to install curl"; exit 1; }
+    fi
+
+    # Loop for up to 30 seconds waiting for Nginx to respond
+    for i in {1..30}; do
+        # -s for silent, -f for fail-fast (don't output HTML on error), -o /dev/null to discard output
+        if curl -sfo /dev/null http://localhost; then
+            log_success "Nginx health check passed. Service is responding."
+            break
+        fi
+        
+        if [ "$i" -eq 30 ]; then
+            log_error "Nginx health check failed. The service started but is not responding."
+            exit 1
+        fi
+        
+        log_debug "Nginx not responding yet, waiting 1s... (Attempt $i/30)"
+        sleep 1
+    done
     
     log_success "Nginx is running and configured to start on boot."
 

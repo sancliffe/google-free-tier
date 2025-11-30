@@ -22,6 +22,45 @@ You should receive a response within 48 hours. The project maintainers will work
 
 ---
 
+## Threat Model
+
+This project is designed to defend against common cloud security threats targeting small-to-medium scale web applications. The primary security goals are to protect user data, ensure service availability, and control costs.
+
+### In-Scope Threats
+
+The security controls implemented in this project primarily mitigate the following threats:
+
+- **Unauthorized Access:**
+  - *Threat:* Malicious actors gaining shell access to the VM or administrative access to GCP resources.
+  - *Mitigation:* Use of Identity-Aware Proxy (IAP) for SSH, OS Login, least-privilege IAM roles, and firewall rules.
+
+- **Data Breaches:**
+  - *Threat:* Exposure of sensitive information such as API keys, credentials, or user data.
+  - *Mitigation:* Storing all secrets in Google Secret Manager, using encrypted and versioned GCS buckets for backups and Terraform state.
+
+- **Denial of Service (DoS) / DDoS Attacks:**
+  - *Threat:* Overwhelming the web server or other public-facing services with traffic, causing service unavailability.
+  - *Mitigation:* Basic rate limiting implemented in Nginx. For more advanced protection, Google Cloud Armor is recommended.
+
+- **Cost Overruns:**
+  - *Threat:* Accidental or malicious activity leading to unexpected and high GCP bills.
+  - *Mitigation:* GCP budget alerts and the automated "Cost Killer" Cloud Function that shuts down the VM when a budget threshold is exceeded.
+
+- **Data Loss:**
+  - *Threat:* Loss of application data due to hardware failure, accidental deletion, or corruption.
+  - *Mitigation:* Automated daily backups to Google Cloud Storage with versioning enabled. A disaster recovery plan is also documented.
+
+### Out-of-Scope Threats
+
+This project is a learning resource and a template; it is not hardened against all possible threats. The following are considered out of scope for the default configuration:
+
+- **Advanced Persistent Threats (APTs):** Sophisticated, long-term attacks by well-funded actors.
+- **Physical Access Attacks:** Compromise of physical GCP data center hardware.
+- **Supply Chain Attacks on Dependencies:** Malicious code injected into third-party libraries (e.g., npm packages, Docker base images). While container scanning is included, a full audit of all dependencies is not performed.
+- **Insider Threats:** Malicious actions by authorized users with legitimate access to the GCP project.
+
+---
+
 ## Security Best Practices
 
 ### For Project Users

@@ -198,15 +198,18 @@ validate_version() {
 
 # --- Exit Trap Handler ---
 # Registers cleanup actions that run on exit or error
-on_error() {
-    local line_num=$1
-    log_error "Script error on line $line_num. Exit code: $?"
+cleanup_on_error() {
+    # This is a placeholder for cleanup actions.
+    # For example, it could remove temporary files.
+    log_debug "Running cleanup actions..."
 }
 
-on_exit() {
-    # Can be overridden by individual scripts
-    :
+handle_error() {
+    local exit_code=$?
+    local line_no=$1
+    log_error "Error on line $line_no (exit code: $exit_code)"
+    cleanup_on_error
+    exit "$exit_code"
 }
 
-trap "on_error \$LINENO" ERR
-trap "on_exit" EXIT
+trap 'handle_error $LINENO' ERR

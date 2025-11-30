@@ -27,6 +27,12 @@ variable "domain_name" {
 variable "gcs_bucket_name" {
   description = "The name of the GCS bucket for backups."
   type        = string
+
+  validation {
+    # GCS bucket naming rules: https://cloud.google.com/storage/docs/naming-buckets
+    condition     = can(regex("^[a-z0-9][a-z0-9-_\\\\.]{1,61}[a-z0-9]$", var.gcs_bucket_name))
+    error_message = "Invalid GCS bucket name. Must contain only lowercase letters, numbers, hyphens, underscores, and dots, and must start and end with a number or letter."
+  }
 }
 
 variable "tf_state_bucket" {
@@ -50,6 +56,11 @@ variable "image_tag" {
 variable "backup_dir" {
   description = "The absolute path of the directory to back up."
   type        = string
+
+  validation {
+    condition     = can(regex("^/", var.backup_dir))
+    error_message = "The backup_dir must be an absolute path (e.g., '/var/www/html')."
+  }
 }
 
 variable "project_id" {
@@ -168,6 +179,12 @@ variable "cost_killer_shutdown_threshold" {
   description = "The budget threshold at which to trigger the VM shutdown (e.g., 1.0 for 100%)."
   type        = number
   default     = 1.0
+}
+
+variable "backup_threshold_hours" {
+  description = "The number of hours after which a backup is considered overdue."
+  type        = number
+  default     = 25
 }
 
 variable "gke_cluster_name" {

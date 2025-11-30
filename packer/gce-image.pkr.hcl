@@ -42,13 +42,10 @@ build {
   sources = ["source.googlecompute.gce"]
 
   provisioner "shell" {
-    # Using Packer's built-in retry mechanism instead of custom shell retry logic
-    max_retries      = 3
-    pause_before     = "10s"
-    valid_exit_codes = [0]
     inline = [
-      "set -euxo pipefail",  # Add -x for debugging
-      "sudo apt-get update",
+      "set -euxo pipefail",
+      # Retry apt-get update until it succeeds to handle transient network issues
+      "until sudo apt-get update; do echo 'apt-get update failed, retrying...' && sleep 5; done",
       "sudo apt-get install -y nginx"
     ]
   }

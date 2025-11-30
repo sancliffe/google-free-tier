@@ -55,11 +55,12 @@ main() {
     log_info "--- Phase 4: Setting up SSL with Let's Encrypt ---"
     ensure_root || exit 1
 
-    DOMAIN="${1:-${DOMAIN:-}}"
-    EMAIL="${2:-${EMAIL:-}}"
+    local DOMAIN="${DOMAIN_NAME}"
+    local EMAIL="${EMAIL_ADDRESS}"
 
     if [[ -z "${DOMAIN}" || -z "${EMAIL}" ]]; then
-        prompt_for_details
+        log_error "Required secrets (DOMAIN_NAME or EMAIL_ADDRESS) not found in environment. Ensure startup script ran successfully."
+        exit 1
     else
         log_info "Using domain: ${DOMAIN}"
         log_info "Using email: ${EMAIL}"
@@ -92,6 +93,15 @@ main() {
     if [[ ! -f "${nginx_config}" ]]; then
         log_info "Creating Nginx server block for ${DOMAIN}..."
         
+        # Create rate-limiting configuration
+        cat <<EOF > /etc/nginx/conf.d/ratelimit.conf
+# Global rate limit for all requests
+limit_req_zone \$binary_remote_addr zone=one:10m rate=15r/s;
+
+# Stricter rate limit for sensitive locations like a login page
+limit_req_zone \$binary_remote_addr zone=login:10m rate=5r/m;
+EOF
+        
         # Backup default config before modification
         local backup_dir
         backup_dir=$(mktemp -d)
@@ -104,11 +114,24 @@ server {
     listen 80;
     server_name ${DOMAIN};
     
+    # Apply the global rate limit
+    limit_req zone=one burst=30 nodelay;
+
     root /var/www/html;
     index index.html index.htm index.nginx-debian.html;
 
     location / {
         try_files \$uri \$uri/ =404;
+    }
+
+    # Example for a sensitive endpoint with stricter rate limiting
+    location = /login {
+        limit_req zone=login burst=5 nodelay;
+        
+        # In a real application, this would proxy to a backend service.
+        # For now, we return a simple message.
+        add_header Content-Type text/plain;
+        return 200 'Login page placeholder. Rate limited to 5 requests per minute.';
     }
 
     # Internal metrics for Google Cloud Ops Agent

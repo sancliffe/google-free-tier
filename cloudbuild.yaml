@@ -40,6 +40,20 @@ steps:
 # 4. Push Docker
 - name: 'gcr.io/cloud-builders/docker'
   args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/hello-app:${SHORT_SHA}']
+
+# 4a. Scan for vulnerabilities
+- name: 'gcr.io/cloud-builders/gcloud'
+  id: 'scan'
+  args:
+    - 'artifacts'
+    - 'docker'
+    - 'images'
+    - 'scan'
+    - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/hello-app:${SHORT_SHA}'
+    - '--format=json'
+    - '--region=${_REGION}'
+    - '--quiet'
+    
 - name: 'gcr.io/cloud-builders/docker'
   args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/hello-app:latest']
 
@@ -54,6 +68,7 @@ steps:
     - 'echo "Initializing with bucket: ${TF_VAR_tf_state_bucket}" && terraform init -backend-config="bucket=${TF_VAR_tf_state_bucket}"'
 # 6. Apply Terraform
 - name: 'hashicorp/terraform:1.8.4'
+  id: 'apply'
   entrypoint: 'sh'
   dir: 'terraform'
   secretEnv: 
@@ -67,10 +82,12 @@ steps:
   args:
     - '-c'
     - |
+      # Apply changes, but if apply fails, run destroy and exit with error
       terraform apply -auto-approve \
         -var="project_id=${PROJECT_ID}" \
         -var="region=${_REGION}" \
-        -var="image_tag=${SHORT_SHA}"
+        -var="image_tag=${SHORT_SHA}" \
+      || (echo "Terraform apply failed. Rolling back..." && terraform destroy -auto-approve && exit 1)
 
 images:
   - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/hello-app:${SHORT_SHA}'

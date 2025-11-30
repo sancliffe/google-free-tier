@@ -3,6 +3,55 @@
 # This startup script is executed when the VM boots up.
 set -e
 
+# --- Error and Exit Handling ---
+handle_exit() {
+    local exit_code=$?
+    # Only act on failures
+    if [ $exit_code -ne 0 ]; then
+        # And only if the main setup did not complete
+        if [ ! -f "$GLOBAL_SETUP_MARKER" ]; then
+            local error_message="Startup script failed on $(hostname) with exit code $exit_code."
+            echo "$error_message" # Log to local file and serial console
+
+            # Send failure log to Google Cloud Logging
+            if command -v gcloud &> /dev/null; then
+                gcloud logging write startup-script-failed "$error_message" --severity=ERROR
+            else
+                echo "gcloud command not found, cannot log to Google Cloud Logging."
+            fi
+            
+            # Attempt to roll back changes
+            rollback_on_failure
+        fi
+    fi
+}
+
+rollback_on_failure() {
+    echo "Attempting to roll back changes due to failure..."
+    # This is a placeholder for rollback logic. A true rollback would be complex
+    # and require reversing the actions of each script. The goal is to return
+    # the system to a known-good state if possible.
+    
+    # Example: Undo Nginx installation if it was installed
+    if command -v nginx &> /dev/null && systemctl is-active --quiet nginx; then
+        echo "Rolling back Nginx installation..."
+        systemctl stop nginx
+        apt-get remove -y nginx nginx-common
+    fi
+    
+    # Example: Undo swap file creation
+    if [ -f /swapfile ]; then
+        echo "Rolling back swap file creation..."
+        swapoff /swapfile && rm /swapfile
+        sed -i '/\/swapfile/d' /etc/fstab
+    fi
+    
+    echo "Rollback placeholder complete. The system may be in an inconsistent state."
+}
+
+# Trap EXIT signal to run the handle_exit function
+trap handle_exit EXIT
+
 # --- Logging Setup ---
 # Redirect stdout and stderr to a log file and the serial console
 exec > >(tee /var/log/startup-script.log | logger -t startup-script -s 2>/dev/console) 2>&1
@@ -20,27 +69,27 @@ echo "--- Startup Script Initiated ---"
 SECRETS_MARKER="/var/lib/google-free-tier-secrets-fetched"
 if [ ! -f "$SECRETS_MARKER" ]; then
     echo "Fetching secrets..."
-    mkdir -p /root/.credentials
-    chmod 700 /root/.credentials
     
-    # Helper function to safely fetch and store a secret
+    # Helper function to safely fetch and export a secret as an environment variable
     fetch_secret() {
-        local secret_name="$$1"
-        local output_file="$$2"
+        local secret_name="$1"
+        local env_var_name="$2"
         
-        if ! gcloud secrets versions access latest --secret="$${secret_name}" --format="value(payload.data)" | base64 --decode > "$${output_file}"; then
-            echo "ERROR: Failed to fetch secret '$${secret_name}'"
+        local secret_value
+        if ! secret_value=$(gcloud secrets versions access latest --secret="${secret_name}" --format="value(payload.data)" | base64 --decode); then
+            echo "ERROR: Failed to fetch secret '${secret_name}'"
             return 1
         fi
-        chmod 600 "$${output_file}"
-        echo "Successfully fetched secret: $${secret_name}"
+        export "${env_var_name}"="${secret_value}"
+        echo "Successfully fetched secret: ${secret_name}"
     }
     
     # Fetch all required secrets, fail if any fails
-    fetch_secret "duckdns_token" "/root/.credentials/duckdns_token" || exit 1
-    fetch_secret "email_address" "/root/.credentials/email_address" || exit 1
-    fetch_secret "domain_name" "/root/.credentials/domain_name" || exit 1
-    fetch_secret "backup_dir" "/root/.credentials/backup_dir" || exit 1
+    fetch_secret "duckdns_token" "DD_AUTH_STRING" || exit 1
+    fetch_secret "email_address" "EMAIL_ADDRESS" || exit 1
+    fetch_secret "domain_name" "DOMAIN_NAME" || exit 1
+    fetch_secret "backup_dir" "BACKUP_DIR" || exit 1
+    fetch_secret "gcs_bucket_name" "GCS_BUCKET_NAME" || exit 1
     
     touch "$SECRETS_MARKER"
     echo "All secrets fetched successfully."
@@ -130,17 +179,7 @@ echo "Running setup scripts..."
     
     if [ ! -f "$SCRIPT_MARKER" ]; then
         echo "Running /tmp/2-host-setup/$SCRIPT"
-        local script_cmd
-        case "$SCRIPT" in
-            "3-setup-duckdns.sh"|"4-setup-ssl.sh"|"6-setup-backups.sh")
-                script_cmd="sudo -E /tmp/2-host-setup/$SCRIPT" # Keep environment for secrets
-                ;;
-            *)
-                script_cmd="sudo /tmp/2-host-setup/$SCRIPT"
-                ;;
-        esac
-
-        if eval "$script_cmd"; then
+        if sudo -E /tmp/2-host-setup/"$SCRIPT"; then
             touch "$SCRIPT_MARKER"
             echo "/tmp/2-host-setup/$SCRIPT completed."
         else
@@ -156,5 +195,13 @@ echo "Running setup scripts..."
   echo "ERROR: Setup scripts failed. Check /var/log/startup-script.log"
   exit 1
 }
+
+# 4. Clean up secrets from environment
+echo "Cleaning up secrets from environment..."
+unset DD_AUTH_STRING
+unset EMAIL_ADDRESS
+unset DOMAIN_NAME
+unset BACKUP_DIR
+unset GCS_BUCKET_NAME
 
 echo "--- Startup Script Complete ---"
