@@ -25,7 +25,7 @@ jobs:
       - name: Setup Node.js (with caching)
         uses: actions/setup-node@v4
         with:
-          node-version: \${{ env.NODE_VERSION }}
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: '**/package-lock.json'
 
@@ -41,14 +41,14 @@ jobs:
       - name: Validate JSON files
         run: |
           find . -name "*.json" -not -path "./node_modules/*" -not -path "./.terraform/*" | while read f; do
-            echo "Validating \$f..."
-            jq empty "\$f" || exit 1
+            echo "Validating $f..."
+            jq empty "$f" || exit 1
           done
 
       - name: Lint YAML files
         run: |
           pip install yamllint
-          yamllint -c '{extends: default, rules: {line-length: {max: 120}, comments: {min-spaces-from-content: 1}}}' \\
+          yamllint -c '{extends: default, rules: {line-length: {max: 120}, comments: {min-spaces-from-content: 1}}}' \
             .github/ terraform/ 2>/dev/null || true
 
       - name: Validate documentation links
@@ -79,14 +79,14 @@ jobs:
           path: |
             terraform/.terraform
             ~/.terraform.d/plugin-cache
-          key: \${{ runner.os }}-terraform-\${{ matrix.tf-version }}-\${{ hashFiles('terraform/.terraform.lock.hcl') }}
+          key: ${{ runner.os }}-terraform-${{ matrix.tf-version }}-${{ hashFiles('terraform/.terraform.lock.hcl') }}
           restore-keys: |
-            \${{ runner.os }}-terraform-\${{ matrix.tf-version }}-
+            ${{ runner.os }}-terraform-${{ matrix.tf-version }}-
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
-          terraform_version: \${{ matrix.tf-version }}
+          terraform_version: ${{ matrix.tf-version }}
 
       - name: Terraform Format Check
         working-directory: terraform
@@ -168,7 +168,7 @@ jobs:
     
     environment: 
       name: production
-      url: https://github.com/\${{ github.repository }}/releases/tag/\${{ github.ref_name }}
+      url: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
 
     permissions:
       contents: write
@@ -224,16 +224,16 @@ jobs:
             
             ## 📥 Quick Start
             
-            \`\`\`bash
+            ```bash
             # Download and extract an archive
-            wget https://github.com/\${{ github.repository }}/releases/download/\${{ github.ref_name }}/app.tar.gz
+            wget [https://github.com/$](https://github.com/$){{ github.repository }}/releases/download/${{ github.ref_name }}/app.tar.gz
             tar -xzf app.tar.gz
             
             # Verify checksums
-            wget https://github.com/\${{ github.repository }}/releases/download/\${{ github.ref_name }}/sha256sums.txt
+            wget [https://github.com/$](https://github.com/$){{ github.repository }}/releases/download/${{ github.ref_name }}/sha256sums.txt
             sha256sum -c sha256sums.txt
-            \`\`\`
+            ```
             
             ## ✅ Verification
             
-            All files include SHA256 checksums in \`sha256sums.txt\` for integrity verification.
+            All files include SHA256 checksums in `sha256sums.txt` for integrity verification.
