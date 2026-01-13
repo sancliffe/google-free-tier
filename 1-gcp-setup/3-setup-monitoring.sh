@@ -52,7 +52,7 @@ log_success "Created Channel: ${CHANNEL_ID}"
 log_warn "Check ${EMAIL_ADDRESS} for a verification email before proceeding."
 read -rp "Press [Enter] to continue..."
 
-# Step 2: Create Uptime Check (Fixed syntax)
+# Step 2: Create Uptime Check using API
 log_info "Step 2: Creating Uptime Check for ${DOMAIN}..."
 
 # Create a temporary JSON file for the uptime check configuration
@@ -77,17 +77,33 @@ cat > "${UPTIME_CONFIG}" << EOF
 }
 EOF
 
-# Create the uptime check using the JSON configuration
-UPTIME_CHECK_ID=$(gcloud monitoring uptime-check-configs create \
-  --config-from-file="${UPTIME_CONFIG}" \
-  --format="value(name)")
+# Get access token
+ACCESS_TOKEN=$(gcloud auth print-access-token)
+
+# Create uptime check via API
+UPTIME_RESPONSE=$(curl -s -X POST \
+  "https://monitoring.googleapis.com/v3/projects/${PROJECT_ID}/uptimeCheckConfigs" \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d @"${UPTIME_CONFIG}")
 
 rm -f "${UPTIME_CONFIG}"
 
+# Extract the uptime check name/ID
+UPTIME_CHECK_ID=$(echo "${UPTIME_RESPONSE}" | grep -o '"name":"[^"]*"' | head -1 | cut -d'"' -f4)
+
+if [[ -z "${UPTIME_CHECK_ID}" ]]; then
+    log_error "Failed to create uptime check. Response: ${UPTIME_RESPONSE}"
+    exit 1
+fi
+
 log_success "Created Uptime Check: ${UPTIME_CHECK_ID}"
 
-# Step 3: Create Alert Policy
+# Step 3: Create Alert Policy using API
 log_info "Step 3: Creating Alert Policy for Uptime Check..."
+
+# Extract just the check_id from the full path
+CHECK_ID_ONLY=$(basename "${UPTIME_CHECK_ID}")
 
 ALERT_CONFIG=$(mktemp)
 cat > "${ALERT_CONFIG}" << EOF
@@ -97,7 +113,7 @@ cat > "${ALERT_CONFIG}" << EOF
     {
       "displayName": "Uptime check failed",
       "conditionThreshold": {
-        "filter": "metric.type=\"monitoring.googleapis.com/uptime_check/check_passed\" AND resource.type=\"uptime_url\" AND metric.label.check_id=\"${UPTIME_CHECK_ID##*/}\"",
+        "filter": "metric.type=\"monitoring.googleapis.com/uptime_check/check_passed\" AND resource.type=\"uptime_url\" AND metric.label.check_id=\"${CHECK_ID_ONLY}\"",
         "comparison": "COMPARISON_LT",
         "thresholdValue": 1,
         "duration": "300s",
@@ -120,11 +136,22 @@ cat > "${ALERT_CONFIG}" << EOF
 }
 EOF
 
-ALERT_POLICY_ID=$(gcloud alpha monitoring policies create \
-  --policy-from-file="${ALERT_CONFIG}" \
-  --format="value(name)")
+# Create alert policy via API
+ALERT_RESPONSE=$(curl -s -X POST \
+  "https://monitoring.googleapis.com/v3/projects/${PROJECT_ID}/alertPolicies" \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d @"${ALERT_CONFIG}")
 
 rm -f "${ALERT_CONFIG}"
+
+# Extract alert policy name
+ALERT_POLICY_ID=$(echo "${ALERT_RESPONSE}" | grep -o '"name":"[^"]*"' | head -1 | cut -d'"' -f4)
+
+if [[ -z "${ALERT_POLICY_ID}" ]]; then
+    log_error "Failed to create alert policy. Response: ${ALERT_RESPONSE}"
+    exit 1
+fi
 
 log_success "Created Alert Policy: ${ALERT_POLICY_ID}"
 
