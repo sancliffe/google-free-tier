@@ -49,7 +49,12 @@ main() {
     fi
     log_info "Operating in project: ${project_id}"
 
-    # SCOPE CHECK: Ensure the VM can actually write to Monitoring
+    # CACHE CLEARING: Force gcloud to pick up updated Scopes/IAM roles
+    log_info "Refreshing gcloud credentials cache..."
+    gcloud auth revoke --all --quiet > /dev/null 2>&1 || true
+    gcloud config set auth/access_token_file "" --quiet > /dev/null 2>&1 || true
+
+    # SCOPE CHECK
     log_info "Checking VM access scopes..."
     local scopes
     scopes=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/scopes)
@@ -57,7 +62,7 @@ main() {
     if [[ ! "$scopes" == *"monitoring"* ]] && [[ ! "$scopes" == *"cloud-platform"* ]]; then
         log_error "INSUFFICIENT ACCESS SCOPES"
         log_warn "Your VM does not have permission to create Monitoring resources."
-        log_info "Please stop the VM and run: gcloud compute instances set-service-account $(hostname) --scopes=cloud-platform --zone=[YOUR_ZONE]"
+        log_info "From Cloud Shell, run: gcloud compute instances set-service-account $(hostname) --scopes=cloud-platform --zone=[YOUR_ZONE]"
         exit 1
     fi
 
@@ -91,25 +96,24 @@ main() {
     log_success "Notification channel created: ${channel_name}"
     
     log_warn "A verification email has been sent to ${email}."
-    log_warn "You must click the link in the email before you can receive alerts."
-    read -r -p "Press [Enter] after you have clicked the verification link..."
+    log_warn "If it doesn't arrive, check Spam/Promotions or trigger it manually in GCP Console."
+    read -r -p "Press [Enter] after you have clicked the verification link (if received)..."
 
-    log_info "Creating HTTP uptime check for https://${domain}..."
-    local uptime_check_id
-    uptime_check_id=$(gcloud monitoring uptime-checks create http "https://${domain}" \
+    # FIX: Corrected syntax for Uptime Check creation
+    log_info "Creating HTTP uptime check for ${domain}..."
+    local check_id="uptime-check-${domain//./-}"
+    gcloud monitoring uptime create http "${check_id}" \
         --project="${project_id}" \
         --display-name="Uptime check for ${domain}" \
-        --format='value(name)')
+        --resource-type="uptime-url" \
+        --resource-labels=host="${domain}",project_id="${project_id}" \
+        --check-interval=300
 
-    if [[ -z "${uptime_check_id}" ]]; then
-        log_error "Failed to create uptime check."
-        exit 1
-    fi
-    log_success "Uptime check created: ${uptime_check_id}"
+    log_success "Uptime check created: ${check_id}"
 
     log_info "Creating alerting policy..."
-    local filter
-    filter="metric.type=\"monitoring.googleapis.com/uptime_check/check_passed\" AND resource.labels.check_id=\"${uptime_check_id##*/}\""
+    # FIX: Refined filter to target the specific check ID
+    local filter="metric.type=\"monitoring.googleapis.com/uptime_check/check_passed\" AND resource.labels.check_id=\"${check_id}\""
 
     local policy_name
     policy_name=$(gcloud monitoring policies create \
@@ -118,7 +122,7 @@ main() {
         --notification-channels="${channel_name}" \
         --condition-display-name="Uptime check failed on ${domain}" \
         --condition-filter="${filter}" \
-        --condition-duration="300s" \
+        --condition-duration="60s" \
         --condition-trigger-count=1 \
         --condition-aggregator=count \
         --documentation="The uptime check for https://${domain} failed. The server may be down or misconfigured." \
@@ -132,7 +136,7 @@ main() {
 
     log_info "------------------------------"
     log_success "Monitoring setup complete!"
-    log_info "You will now receive an email at ${email} if https://${domain} is down for more than 5 minutes."
+    log_info "You will now receive an email at ${email} if https://${domain} is down."
 }
 
 main
