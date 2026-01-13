@@ -38,9 +38,28 @@ main() {
     echo -e "\033[0;33mWARNING: The information you enter will be stored in your shell's history.\033[0m"
     echo -e "\033[0;33mTo avoid this, you can run the script in a new shell with 'bash' and exit immediately after.\033[0m"
 
+    # DYNAMIC PROJECT ID LOOKUP
     local project_id
-    project_id=$(gcloud config get-value project)
+    project_id="${GOOGLE_CLOUD_PROJECT:-$(gcloud config get-value project 2>/dev/null)}"
+    
+    if [[ -z "${project_id}" ]]; then
+        log_error "Project ID could not be determined."
+        log_info "Run 'gcloud config set project [PROJECT_ID]' or set GOOGLE_CLOUD_PROJECT environment variable."
+        exit 1
+    fi
     log_info "Operating in project: ${project_id}"
+
+    # SCOPE CHECK: Ensure the VM can actually write to Monitoring
+    log_info "Checking VM access scopes..."
+    local scopes
+    scopes=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/scopes)
+    
+    if [[ ! "$scopes" == *"monitoring"* ]] && [[ ! "$scopes" == *"cloud-platform"* ]]; then
+        log_error "INSUFFICIENT ACCESS SCOPES"
+        log_warn "Your VM does not have permission to create Monitoring resources."
+        log_info "Please stop the VM and run: gcloud compute instances set-service-account $(hostname) --scopes=cloud-platform --zone=[YOUR_ZONE]"
+        exit 1
+    fi
 
     local email
     read -r -p "Enter the email address for alert notifications: " email
@@ -58,6 +77,7 @@ main() {
     log_info "Creating email notification channel for ${email}..."
     local channel_name
     channel_name=$(gcloud beta monitoring channels create \
+        --project="${project_id}" \
         --display-name="${display_name}" \
         --description="Email channel for VM alerts" \
         --type=email \
@@ -77,6 +97,7 @@ main() {
     log_info "Creating HTTP uptime check for https://${domain}..."
     local uptime_check_id
     uptime_check_id=$(gcloud monitoring uptime-checks create http "https://${domain}" \
+        --project="${project_id}" \
         --display-name="Uptime check for ${domain}" \
         --format='value(name)')
 
@@ -92,6 +113,7 @@ main() {
 
     local policy_name
     policy_name=$(gcloud monitoring policies create \
+        --project="${project_id}" \
         --display-name="[${domain}] Site Down" \
         --notification-channels="${channel_name}" \
         --condition-display-name="Uptime check failed on ${domain}" \
