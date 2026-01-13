@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 1. Define your Project ID
-PROJECT_ID="your-project-id-here"
+PROJECT_ID=$(gcloud config get-value project)
 ZONE="us-west1-a"
 VM_NAME="free-tier-vm"
 
