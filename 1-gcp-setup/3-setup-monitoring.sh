@@ -55,6 +55,12 @@ read -rp "Press [Enter] to continue..."
 # Step 2: Create Uptime Check using API
 log_info "Step 2: Creating Uptime Check for ${DOMAIN}..."
 
+# Install jq if not present (for JSON parsing)
+if ! command -v jq &> /dev/null; then
+    log_info "Installing jq for JSON parsing..."
+    sudo apt-get update -qq && sudo apt-get install -y jq -qq
+fi
+
 # Create a temporary JSON file for the uptime check configuration
 UPTIME_CONFIG=$(mktemp)
 cat > "${UPTIME_CONFIG}" << EOF
@@ -89,8 +95,15 @@ UPTIME_RESPONSE=$(curl -s -X POST \
 
 rm -f "${UPTIME_CONFIG}"
 
-# Extract the uptime check name/ID
-UPTIME_CHECK_ID=$(echo "${UPTIME_RESPONSE}" | grep -o '"name":"[^"]*"' | head -1 | cut -d'"' -f4)
+# Check for errors in response
+if echo "${UPTIME_RESPONSE}" | jq -e '.error' > /dev/null 2>&1; then
+    log_error "API Error: $(echo "${UPTIME_RESPONSE}" | jq -r '.error.message')"
+    log_error "Full response: ${UPTIME_RESPONSE}"
+    exit 1
+fi
+
+# Extract the uptime check name/ID using jq
+UPTIME_CHECK_ID=$(echo "${UPTIME_RESPONSE}" | jq -r '.name // empty')
 
 if [[ -z "${UPTIME_CHECK_ID}" ]]; then
     log_error "Failed to create uptime check. Response: ${UPTIME_RESPONSE}"
@@ -145,8 +158,15 @@ ALERT_RESPONSE=$(curl -s -X POST \
 
 rm -f "${ALERT_CONFIG}"
 
-# Extract alert policy name
-ALERT_POLICY_ID=$(echo "${ALERT_RESPONSE}" | grep -o '"name":"[^"]*"' | head -1 | cut -d'"' -f4)
+# Check for errors in response
+if echo "${ALERT_RESPONSE}" | jq -e '.error' > /dev/null 2>&1; then
+    log_error "API Error: $(echo "${ALERT_RESPONSE}" | jq -r '.error.message')"
+    log_error "Full response: ${ALERT_RESPONSE}"
+    exit 1
+fi
+
+# Extract alert policy name using jq
+ALERT_POLICY_ID=$(echo "${ALERT_RESPONSE}" | jq -r '.name // empty')
 
 if [[ -z "${ALERT_POLICY_ID}" ]]; then
     log_error "Failed to create alert policy. Response: ${ALERT_RESPONSE}"
