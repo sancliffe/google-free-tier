@@ -18,7 +18,7 @@ gcloud compute instances create $VM_NAME \
     --maintenance-policy=MIGRATE \
     --service-account=$SERVICE_ACCOUNT \
     --scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/pubsub,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/trace.append \
-    --create-disk=auto-delete=yes,boot=yes,device-name=persistent-disk-0,image=projects/debian-cloud/global/licenses/debian-12-bookworm,mode=rw,size=30 \
+    --create-disk=auto-delete=yes,boot=yes,device-name=persistent-disk-0,image-family=debian-12,image-project=debian-cloud,mode=rw,size=30,type=pd-standard \
     --no-shielded-secure-boot \
     --shielded-vtpm \
     --shielded-integrity-monitoring
