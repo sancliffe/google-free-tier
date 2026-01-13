@@ -7,7 +7,7 @@
 
 set -euo pipefail
 
-REGION="us-central1"
+REGION="us-west1-a"
 REPO_NAME="gke-apps"
 DESCRIPTION="Docker repository for GKE apps"
 
