@@ -31,4 +31,4 @@ gcloud compute firewall-rules create allow-https \
     --action=ALLOW \
     --rules=tcp:443 \
     --source-ranges=0.0.0.0/0 \
-    --target-tags=http-server
+    --target-tags=https-server
