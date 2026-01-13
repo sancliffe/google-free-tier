@@ -1,3 +1,3 @@
 gcloud compute instances add-tags free-tier-vm \
     --tags=http-server,https-server \
-    --zone=us-central1-a
+    --zone=us-west1-a
