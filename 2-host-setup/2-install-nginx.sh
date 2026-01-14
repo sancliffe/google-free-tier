@@ -19,24 +19,27 @@ set_strict_mode
 create_optimized_nginx_config() {
     log_info "Applying Nginx performance optimizations for e2-micro..."
     
-    local config_file="/etc/nginx/conf.d/e2-micro-optimizations.conf"
+    local main_config="/etc/nginx/nginx.conf"
+    local http_config="/etc/nginx/conf.d/e2-micro-optimizations.conf"
     
-    # backup_file is from common.sh
-    backup_file "$config_file" "/etc/nginx/conf.d"
+    # Backup main nginx.conf
+    backup_file "$main_config" "/etc/nginx"
     
-    cat <<'EOF' > "$config_file"
-# Custom optimizations for e2-micro instances.
+    # Update worker_processes in main nginx.conf
+    # This directive MUST be in the main context, not in conf.d includes
+    if grep -q "^worker_processes" "$main_config"; then
+        sed -i 's/^worker_processes.*/worker_processes 1;/' "$main_config"
+        log_info "Updated worker_processes in main nginx.conf"
+    fi
+    
+    # Create http-level optimizations in conf.d
+    backup_file "$http_config" "/etc/nginx/conf.d"
+    
+    cat <<'EOF' > "$http_config"
+# Custom HTTP optimizations for e2-micro instances.
 # These values are tuned for a low-memory, shared-CPU environment.
 
-# e2-micro has 2 vCPUs, but they are shared-core. 
-# 1 worker process is a safe default to conserve memory.
-worker_processes 1;
-
-events {
-    # Lower the number of connections per worker. Default is 768 on Debian.
-    # 512 is a conservative value for a 1GB RAM instance.
-    worker_connections 512;
-}
+# Note: worker_processes must be set in /etc/nginx/nginx.conf, not here
 
 # Shorter timeouts to free up worker connections faster, reducing memory usage.
 keepalive_timeout 20s;
@@ -80,7 +83,7 @@ gzip_types
     text/xml;
 EOF
 
-    log_success "Nginx optimization config created at $config_file."
+    log_success "Nginx optimization config created at $http_config."
 }
 
 # --- Main Logic ---
@@ -124,6 +127,13 @@ main() {
     # `systemctl enable` is idempotent. It will only create the link if it doesn't exist.
     if ! systemctl enable nginx; then
         log_error "Failed to enable Nginx to start on boot."
+        exit 1
+    fi
+
+    log_info "Testing Nginx configuration..."
+    if ! nginx -t; then
+        log_error "Nginx configuration test failed. Please check the error messages above."
+        log_info "👉 Try running: sudo nginx -t"
         exit 1
     fi
 
