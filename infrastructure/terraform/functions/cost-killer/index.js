@@ -30,13 +30,16 @@ async function stopInstanceWithRetry(projectId, zone, instanceName, maxRetries =
 async function checkOverride() {
     try {
         const doc = await firestore.collection('cost_killer_override').doc('override').get();
-        if (doc.exists && doc.data().enabled) {
+        if (doc.exists && doc.data().enabled === true) {
+            console.log('Override detected - shutdown will be skipped.');
             return true;
         }
+        return false;
     } catch (err) {
-        console.error('Error checking for override:', err);
+        console.error('Error checking for override:', err.message);
+        // On error, default to NOT overriding (safe failure)
+        return false;
     }
-    return false;
 }
 
 

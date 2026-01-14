@@ -114,14 +114,15 @@ const server = app.listen(PORT, () => {
 const gracefulShutdown = () => {
   // GKE termination grace period is 30s by default
   // We give 25s for graceful shutdown to allow 5s buffer
+  const DEFAULT_TIMEOUT = 25000;
   let SHUTDOWN_TIMEOUT = parseInt(process.env.SHUTDOWN_TIMEOUT || '25000', 10);
 
   if (isNaN(SHUTDOWN_TIMEOUT) || SHUTDOWN_TIMEOUT <= 0) {
-    console.error('Invalid SHUTDOWN_TIMEOUT, using default 25000ms');
-    SHUTDOWN_TIMEOUT = 25000;
+    console.warn(`Invalid SHUTDOWN_TIMEOUT value: ${process.env.SHUTDOWN_TIMEOUT}, using default ${DEFAULT_TIMEOUT}ms`);
+    SHUTDOWN_TIMEOUT = DEFAULT_TIMEOUT;
   }
 
-  console.log('Received kill signal, shutting down gracefully.');
+  console.log(`Received kill signal, shutting down gracefully (${SHUTDOWN_TIMEOUT}ms timeout).`);
   server.close(() => {
     console.log('Closed out remaining connections.');
     process.exit(0);

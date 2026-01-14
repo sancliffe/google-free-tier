@@ -28,17 +28,29 @@ check_dns() {
     
     log_debug "Public IP: ${public_ip}"
 
-    # Strictly filter for IPv4 and handle multiple records
+    # Check DNS against multiple servers for consistency during propagation
     log_debug "Looking up DNS records for ${DOMAIN}..."
     local domain_ip
-    domain_ip=$(timeout 10 dig +short "${DOMAIN}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
-
-    if [[ -z "${domain_ip}" ]]; then
+    local dns_servers=("8.8.8.8" "1.1.1.1")
+    local all_ips=()
+    
+    for dns_server in "${dns_servers[@]}"; do
+        local ip
+        ip=$(timeout 5 dig +short @"${dns_server}" "${DOMAIN}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
+        if [[ -n "${ip}" ]]; then
+            all_ips+=("${ip}")
+        fi
+    done
+    
+    if [[ ${#all_ips[@]} -eq 0 ]]; then
         log_error "DNS record for ${DOMAIN} not found or not yet propagated."
         log_info "Please ensure an A record exists pointing to ${public_ip}"
         log_info "💡 DuckDNS might take 5-10 minutes to propagate."
         exit 1
     fi
+    
+    # Use the first resolved IP
+    domain_ip="${all_ips[0]}"
     
     if [[ "${public_ip}" != "${domain_ip}" ]]; then
         log_error "DNS mismatch detected!"

@@ -30,8 +30,11 @@ variable "gcs_bucket_name" {
 
   validation {
     # GCS bucket naming rules: https://cloud.google.com/storage/docs/naming-buckets
-    condition     = can(regex("^[a-z0-9][a-z0-9-_\\\\.]{1,61}[a-z0-9]$", var.gcs_bucket_name))
-    error_message = "Invalid GCS bucket name. Must contain only lowercase letters, numbers, hyphens, underscores, and dots, and must start and end with a number or letter."
+    # - Must be 3-63 characters
+    # - Can contain only lowercase letters, numbers, hyphens, underscores, and dots
+    # - Must start and end with a lowercase letter or number
+    condition     = can(regex("^[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$", var.gcs_bucket_name))
+    error_message = "Invalid GCS bucket name. Must be 3-63 characters, contain only lowercase letters, numbers, hyphens, underscores, and dots, and must start and end with a lowercase letter or number."
   }
 }
 

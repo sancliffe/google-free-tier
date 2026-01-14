@@ -120,6 +120,7 @@ test_backup_restoration() {
     log "Downloading latest backup to ${test_dir}..."
     if ! gsutil cp "gs://${BUCKET_NAME}/${BACKUP_FILENAME}" "${test_dir}/"; then
         log "Restoration test failed: Could not download backup file."
+        rm -rf "${test_dir}"
         # This is not a fatal error for the main backup script, so we don't exit.
         return 1
     fi
@@ -127,14 +128,16 @@ test_backup_restoration() {
     log "Extracting backup..."
     if ! tar -xzf "${test_dir}/${BACKUP_FILENAME}" -C "${test_dir}"; then
         log "Restoration test failed: Could not extract backup file."
+        rm -rf "${test_dir}"
         return 1
-    }
+    fi
     
     # Check if the backed up directory exists after extraction
     if [[ ! -d "${test_dir}/$(basename "${BACKUP_DIR}")" ]]; then
         log "Restoration test failed: Backed up directory not found in archive."
+        rm -rf "${test_dir}"
         return 1
-    }
+    fi
     
     log "✅ Restoration test passed. Backup is valid."
     rm -rf "${test_dir}"
