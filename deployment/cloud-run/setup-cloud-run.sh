@@ -8,7 +8,7 @@
 # --- Strict Mode & Helpers ---
 set -euo pipefail
 # shellcheck source=2-host-setup/common.sh
-source "$(dirname "$0")/../2-host-setup/common.sh" # Re-use our logger
+source "$(dirname "$0")/../vm-setup/common.sh" # Re-use our logger
 
 # --- Pre-flight Checks ---
 check_command() {

@@ -1,9 +1,0 @@
-{
-  "name": "cost-killer",
-  "version": "1.0.0",
-  "description": "A Cloud Function to stop a VM when the budget is exceeded",
-  "main": "index.js",
-  "dependencies": {
-    "@google-cloud/compute": "^3.0.0"
-  }
-}

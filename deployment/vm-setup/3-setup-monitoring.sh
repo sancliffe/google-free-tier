@@ -13,8 +13,8 @@ DOMAIN="$5"
 PROJECT_ID="$6"
 
 # Source common functions if available
-if [[ -f "${SCRIPT_DIR}/../2-host-setup/common.sh" ]]; then
-    source "${SCRIPT_DIR}/../2-host-setup/common.sh"
+if [[ -f "${SCRIPT_DIR}/./common.sh" ]]; then
+    source "${SCRIPT_DIR}/./common.sh"
 else
     # Minimal logging functions if common.sh not available
     log_info() { echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") [INFO] $*"; }

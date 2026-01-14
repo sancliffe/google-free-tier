@@ -13,8 +13,8 @@ BILLING_ACCOUNT_ID=""
 PROJECT_ID=""
 
 # Source common functions if available
-if [[ -f "${SCRIPT_DIR}/../2-host-setup/common.sh" ]]; then
-    source "${SCRIPT_DIR}/../2-host-setup/common.sh"
+if [[ -f "${SCRIPT_DIR}/./common.sh" ]]; then
+    source "${SCRIPT_DIR}/./common.sh"
 else
     log_info() { echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") [INFO] $*"; }
     log_success() { echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") [SUCCESS] $*"; }

@@ -189,7 +189,7 @@ load_and_prompt_config() {
 
   
 
-      "${SCRIPT_DIR}/2-open-firewall.sh" "${config[VM_NAME]}" "${config[ZONE]}" "${config[FIREWALL_RULE_NAME]}" "${config[PROJECT_ID]}" "${config[TAGS]}"
+      "${SCRIPT_DIR}/2-firewall-gcp-open.sh" "${config[VM_NAME]}" "${config[ZONE]}" "${config[FIREWALL_RULE_NAME]}" "${config[PROJECT_ID]}" "${config[TAGS]}"
 
   
 

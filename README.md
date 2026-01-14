@@ -91,6 +91,26 @@ This project is committed to being a welcoming and safe community for all contri
 
 ---
 
+## Project Structure
+
+The project is now organized by function:
+
+```
+docs/                    # All documentation
+infrastructure/          # Infrastructure-as-code (Terraform, Packer, Kubernetes)
+deployment/             # Deployment scripts organized by type
+  ├── vm-setup/         # Manual VM setup (Phase 1-2)
+  ├── cloud-run/        # Cloud Run deployment (Phase 3)
+  └── gke/              # GKE deployment (Phase 4)
+app/                    # Application code
+scripts/                # Utility scripts
+  ├── validation/       # Validation and testing scripts
+  ├── setup/            # Setup/initialization scripts
+  └── maintenance/      # Cost and maintenance scripts
+```
+
+---
+
 ## Quick Start
 
 Ready to get started? Here's the 30-second setup:
@@ -101,19 +121,19 @@ git clone https://github.com/BranchingBad/google-free-tier.git
 cd google-free-tier
 
 # 2. Make setup scripts executable
-chmod +x 1-gcp-setup/setup-gcp.sh 2-host-setup/*.sh 3-cloud-run-deployment/*.sh 3-gke-deployment/*.sh
+chmod +x deployment/vm-setup/*.sh deployment/cloud-run/*.sh deployment/gke/*.sh
 
 # 3. Choose your path:
 # - Manual: Start with Phase 1 below
 # - Cloud Run: Jump to Phase 3 after Phase 1
 # - Kubernetes: Jump to Phase 4 after Phase 1
-- Full IaC: Jump to Phase 5 after Phase 1
+# - Full IaC: Jump to Phase 5 after Phase 1
 
 ### Before You Begin
 
 Run the prerequisites check:
 ```bash
-bash scripts/check-prerequisites.sh
+bash scripts/validation/check-prerequisites.sh
 ```
 
 This verifies:
@@ -124,8 +144,8 @@ This verifies:
 ```
 
 ## Pre-Terraform Checklist
-- [ ] Run `bash scripts/validate-backend.sh` before any terraform command
-- [ ] Ensure `backend "gcs"` block is uncommented in `backend.tf`
+- [ ] Run `bash scripts/validation/validate-backend.sh` before any terraform command
+- [ ] Ensure `backend "gcs"` block is uncommented in `infrastructure/terraform/backend.tf`
 - [ ] Verify state bucket exists: `gsutil ls gs://PROJECT_ID-tfstate`
 
 **Estimated Time:** 
@@ -145,7 +165,7 @@ This phase prepares your GCP environment by creating a VM, setting up firewall r
 Before running the script, you need to create a configuration file.
 
 ```bash
-cd 1-gcp-setup
+cd deployment/vm-setup
 cp config.sh.example config.sh
 ```
 
@@ -153,7 +173,7 @@ Now, edit `config.sh` and fill in the required values for your environment.
 
 ### 2. Run the Setup Script
 
-Once the configuration is ready, run the automated setup script from the `1-gcp-setup` directory:
+Once the configuration is ready, run the automated setup script from the `deployment/vm-setup` directory:
 
 ```bash
 bash ./setup-gcp.sh
@@ -172,7 +192,7 @@ The script is idempotent, meaning you can safely run it multiple times. After ru
 After running the setup script, validate that all resources were created:
 
 ```bash
-cd 1-gcp-setup
+cd deployment/vm-setup
 bash validate-setup.sh
 ```
 
@@ -191,7 +211,7 @@ Results: 5 passed, 0 failed
 
 ## Phase 2: Host VM Setup (Manual)
 
-SSH into your VM and run these scripts from the `2-host-setup/` directory.
+SSH into your VM and run these scripts from the `deployment/vm-setup/` directory.
 
 ```bash
 gcloud compute ssh free-tier-vm --zone=us-central1-a
@@ -203,17 +223,17 @@ git clone https://github.com/BranchingBad/google-free-tier.git
 cd google-free-tier
 
 # Make scripts executable
-chmod +x 2-host-setup/*.sh
+chmod +x deployment/vm-setup/*.sh
 ```
 
-The scripts in `2-host-setup/` are numbered for clarity. Run them in order. They are idempotent (can be safely re-run).
+The scripts in `deployment/vm-setup/` are numbered for clarity. Run them in order. They are idempotent (can be safely re-run).
 
 ### 1. Create Swap File 
 
 Creates a 2GB swap file to support the 1GB RAM limit of the e2-micro.
 
 ```bash
-sudo bash ./2-host-setup/1-create-swap.sh
+sudo bash ./deployment/vm-setup/1-create-swap.sh
 ```
 
 **Validation:** Check swap is active:
@@ -227,7 +247,7 @@ swapon --show
 Installs and enables the web server.
 
 ```bash
-sudo bash ./2-host-setup/2-install-nginx.sh
+sudo bash ./deployment/vm-setup/2-install-nginx.sh
 ```
 
 **Validation:** Visit your VM's external IP in a browser:
@@ -240,12 +260,12 @@ curl http://$(curl -s ifconfig.me)
 Configures a cron job to keep your dynamic DNS updated.
 
 ```bash
-bash ./2-host-setup/3-setup-duckdns.sh
+bash ./deployment/vm-setup/3-setup-duckdns.sh
 ```
 
 Or provide arguments to skip prompts:
 ```bash
-bash ./2-host-setup/3-setup-duckdns.sh "your-subdomain" "your-duckdns-token"
+bash ./deployment/vm-setup/3-setup-duckdns.sh "your-subdomain" "your-duckdns-token"
 ```
 
 **Validation:** Check the cron job:
@@ -258,12 +278,12 @@ crontab -l | grep duckdns
 Installs Let's Encrypt SSL certificates using Certbot.
 
 ```bash
-sudo bash ./2-host-setup/4-setup-ssl.sh
+sudo bash ./deployment/vm-setup/4-setup-ssl.sh
 ```
 
 Or with arguments:
 ```bash
-sudo bash ./2-host-setup/4-setup-ssl.sh "your-domain.duckdns.org" "your-email@example.com"
+sudo bash ./deployment/vm-setup/4-setup-ssl.sh "your-domain.duckdns.org" "your-email@example.com"
 ```
 
 **Important:** Ensure your domain is pointing to your server before running this script. The script performs a DNS pre-flight check.
@@ -278,7 +298,7 @@ curl https://your-domain.duckdns.org
 Configures `ufw` to allow Nginx traffic (if active).
 
 ```bash
-sudo bash ./2-host-setup/5-adjust-firewall.sh
+sudo bash ./deployment/vm-setup/5-firewall-config-host.sh
 ```
 
 This script automatically checks if `ufw` is active before making changes.
@@ -289,10 +309,10 @@ Configures a daily cron job to back up your site to Google Cloud Storage.
 
 ```bash
 # Interactive mode
-sudo bash ./2-host-setup/6-setup-backups.sh
+sudo bash ./deployment/vm-setup/6-setup-backups.sh
 
 # With arguments
-sudo bash ./2-host-setup/6-setup-backups.sh "your-backup-bucket-name" "/var/www/html"
+sudo bash ./deployment/vm-setup/6-setup-backups.sh "your-backup-bucket-name" "/var/www/html"
 ```
 
 **Note:** You must create the GCS bucket first:
@@ -340,7 +360,7 @@ rm -r /tmp/restore-test/
 Installs Fail2Ban and configures unattended security updates.
 
 ```bash
-sudo bash ./2-host-setup/7-setup-security.sh
+sudo bash ./deployment/vm-setup/7-setup-security.sh
 ```
 
 **Validation:** Check Fail2Ban status:
@@ -353,7 +373,7 @@ sudo fail2ban-client status
 Installs the Google Cloud Ops Agent to monitor Memory and Swap usage (metrics not available by default).
 
 ```bash
-sudo bash ./2-host-setup/8-setup-ops-agent.sh
+sudo bash ./deployment/vm-setup/8-setup-ops-agent.sh
 ```
 
 This enables enhanced monitoring in Cloud Console for memory and swap metrics.
@@ -395,7 +415,7 @@ Deploy a Node.js application to Google Cloud Run (Free Tier eligible). The updat
 ### Deploy to Cloud Run
 ```bash
 # From your local machine (in the repository root)
-bash ./3-cloud-run-deployment/setup-cloud-run.sh
+bash ./deployment/cloud-run/setup-cloud-run.sh
 ```
 
 This script will:
@@ -450,7 +470,7 @@ Deploy the same Firestore-connected Node.js application to GKE Autopilot.
 
 ```bash
 # From your local machine (in the repository root)
-bash ./3-gke-deployment/setup-gke.sh
+bash ./deployment/gke/setup-gke.sh
 ```
 
 This script will:
@@ -499,7 +519,7 @@ terraform destroy
 
 ## Phase 5: Terraform (Infrastructure as Code)
 
-The terraform/ directory automates the creation of all infrastructure including VM, GKE cluster, Cloud Run services, monitoring, and "Cost Killer" logic. It also handles the enabling of Firestore APIs and IAM permissions required for the new application features.
+The `infrastructure/terraform/` directory automates the creation of all infrastructure including VM, GKE cluster, Cloud Run services, monitoring, and "Cost Killer" logic. It also handles the enabling of Firestore APIs and IAM permissions required for the new application features.
 
 ### Prerequisites
 - Terraform installed on your local machine
@@ -511,7 +531,7 @@ The terraform/ directory automates the creation of all infrastructure including 
 Before running the main Terraform configuration, create a GCS bucket to store Terraform state.
 
 ```bash
-cd terraform/bootstrap
+cd infrastructure/terraform/bootstrap
 terraform init
 terraform apply
 ```
@@ -520,7 +540,7 @@ Enter your GCP project ID when prompted. This creates a versioned GCS bucket nam
 
 ### 2. Configure Variables
 
-Create a `terraform/terraform.tfvars` file in the main `terraform/` directory:
+Create a `infrastructure/terraform/terraform.tfvars` file:
 
 ```hcl
 project_id              = "your-gcp-project-id"
@@ -552,13 +572,13 @@ cost_killer_shutdown_threshold = 1.0 # Shutdown VM at 100% of budget
 
 ### 3. Initialize Terraform
 
-Navigate to the `terraform/` directory and initialize with your state bucket:
+Navigate to the `infrastructure/terraform/` directory and initialize with your state bucket:
 
 ```bash
 # Set your values
 TF_STATE_BUCKET="your-project-id-tfstate" # The GCS bucket for your Terraform state
 
-cd terraform
+cd infrastructure/terraform
 terraform init -backend-config="bucket=${TF_STATE_BUCKET}"
 ```
 
