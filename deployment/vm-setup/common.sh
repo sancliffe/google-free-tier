@@ -30,30 +30,31 @@ _log() {
     local message="$3"
     local timestamp
     timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    local prefix="${timestamp} [${level}]"
+    local prefix="${timestamp} ${color}[${level}]\033[0m"
 
     # Console Output
     # Errors go to stderr, everything else to stdout
     if [[ "${level}" == "ERROR" ]]; then
-        echo -e "${prefix} ${color}${message}\033[0m" >&2
+        echo -e "${prefix} ${message}" >&2
     else
-        echo -e "${prefix} ${color}${message}\033[0m"
+        echo -e "${prefix} ${message}"
     fi
 
     # File Output
     if [[ -n "${LOG_FILE:-}" ]]; then
         # Strip ANSI color codes for plain text logging
-        echo "${prefix} ${message}" >> "${LOG_FILE}"
+        echo "${timestamp} [${level}] ${message}" >> "${LOG_FILE}"
     fi
 }
 
 log_info() {
-    _log "INFO" "" "$1"
+    # Blue
+    _log "INFO" "\033[0;36m" "$1"
 }
 
 log_success() {
-    # Green
-    _log "✅" "\033[0;32m" "$1"
+    # Green with checkmark
+    _log "✅ SUCCESS" "\033[0;32m" "$1"
 }
 
 log_warn() {

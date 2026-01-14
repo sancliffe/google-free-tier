@@ -47,10 +47,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 # --- Logging Helpers ---
-log_info()    { echo -e "\033[0;34m[INFO]\033[0m $*"; }
-log_success() { echo -e "\033[0;32m[SUCCESS]\033[0m $*"; }
-log_warn()    { echo -e "\033[0;33m[WARN]\033[0m $*"; }
-log_error()   { echo -e "\033[0;31m[ERROR]\033[0m $*"; }
+# Using the common.sh logging functions that are sourced above
+# log_info, log_success, log_warn, log_error are already defined in common.sh
 
 echo "------------------------------------------------------------"
 log_info "Starting Host-Phase Cleanup"

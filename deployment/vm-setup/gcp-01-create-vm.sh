@@ -7,14 +7,23 @@ VM_NAME="$1"
 ZONE="$2"
 PROJECT_ID="$3"
 
-echo "Checking if VM '$VM_NAME' already exists in project '$PROJECT_ID' zone '$ZONE'..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./common.sh
+if [[ -f "${SCRIPT_DIR}/common.sh" ]]; then
+    source "${SCRIPT_DIR}/common.sh"
+else
+    log_info() { echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [INFO] $*"; }
+    log_success() { echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [✅ SUCCESS] $*"; }
+fi
+
+log_info "Checking if VM '$VM_NAME' already exists in project '$PROJECT_ID' zone '$ZONE'..."
 
 if gcloud compute instances describe "$VM_NAME" --project="$PROJECT_ID" --zone="$ZONE" &>/dev/null; then
-  echo "VM '$VM_NAME' already exists. Exiting."
+  log_info "VM '$VM_NAME' already exists. Exiting."
   exit 0
 fi
 
-echo "VM '$VM_NAME' does not exist. Proceeding with creation."
+log_info "VM '$VM_NAME' does not exist. Proceeding with creation."
 
 # 2. Automatically fetch the Project Number for the dynamic Service Account.
 #    This service account is created by default for Compute Engine instances.
@@ -24,7 +33,7 @@ SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 # 3. Execute the creation command.
 #    - e2-micro is part of Google Cloud's free tier.
 #    - debian-12 is a common, stable Linux distribution.
-echo "Creating VM '$VM_NAME'..."
+log_info "Creating VM '$VM_NAME'..."
 gcloud compute instances create "$VM_NAME" \
     --project="$PROJECT_ID" \
     --zone="$ZONE" \
@@ -38,4 +47,4 @@ gcloud compute instances create "$VM_NAME" \
     --shielded-vtpm \
     --shielded-integrity-monitoring
 
-echo "VM '$VM_NAME' created successfully."
+log_success "VM '$VM_NAME' created successfully."

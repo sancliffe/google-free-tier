@@ -55,17 +55,22 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Source common logging functions
+# shellcheck source=./common.sh
+if [[ -f "${SCRIPT_DIR}/common.sh" ]]; then
+    source "${SCRIPT_DIR}/common.sh"
+else
+    # Fallback logging functions if common.sh is not available
+    log_info()    { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] \033[0;36m[INFO]\033[0m $*"; }
+    log_success() { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] \033[0;32m[✅ SUCCESS]\033[0m $*"; }
+    log_warn()    { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] \033[0;33m[WARN]\033[0m $*"; }
+    log_error()   { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] \033[0;31m[ERROR]\033[0m $*"; }
+fi
+
 # If PROJECT_ID is not set by args or config, get it from gcloud
 if [[ -z "${PROJECT_ID}" ]]; then
     PROJECT_ID=$(gcloud config get-value project)
 fi
-
-
-# Logging Helpers
-log_info()    { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] \033[0;34m[INFO]\033[0m $*"; }
-log_success() { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] \033[0;32m[SUCCESS]\033[0m $*"; }
-log_warn()    { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] \033[0;33m[WARN]\033[0m $*"; }
-log_error()   { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] \033[0;31m[ERROR]\033[0m $*"; }
 
 
 echo "------------------------------------------------------------"

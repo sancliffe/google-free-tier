@@ -9,20 +9,28 @@ FIREWALL_RULE_NAME="$3"
 PROJECT_ID="$4"
 TAGS="$5"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./common.sh
+if [[ -f "${SCRIPT_DIR}/common.sh" ]]; then
+    source "${SCRIPT_DIR}/common.sh"
+else
+    log_info() { echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [INFO] $*"; }
+    log_success() { echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [✅ SUCCESS] $*"; }
+fi
 
-echo "Adding network tags '$TAGS' to VM '$VM_NAME'..."
+log_info "Adding network tags '$TAGS' to VM '$VM_NAME'..."
 gcloud compute instances add-tags "$VM_NAME" \
     --project="$PROJECT_ID" \
     --zone="$ZONE" \
     --tags="$TAGS"
 
-echo "Checking if firewall rule '$FIREWALL_RULE_NAME' already exists..."
+log_info "Checking if firewall rule '$FIREWALL_RULE_NAME' already exists..."
 if gcloud compute firewall-rules describe "$FIREWALL_RULE_NAME" --project="$PROJECT_ID" &>/dev/null; then
-  echo "Firewall rule '$FIREWALL_RULE_NAME' already exists. Exiting."
+  log_info "Firewall rule '$FIREWALL_RULE_NAME' already exists. Exiting."
   exit 0
 fi
 
-echo "Firewall rule '$FIREWALL_RULE_NAME' does not exist. Proceeding with creation."
+log_info "Firewall rule '$FIREWALL_RULE_NAME' does not exist. Proceeding with creation."
 gcloud compute firewall-rules create "$FIREWALL_RULE_NAME" \
     --project="$PROJECT_ID" \
     --description="Allow incoming HTTP and HTTPS traffic" \
@@ -34,4 +42,4 @@ gcloud compute firewall-rules create "$FIREWALL_RULE_NAME" \
     --source-ranges=0.0.0.0/0 \
     --target-tags="$TAGS"
 
-echo "Firewall rule '$FIREWALL_RULE_NAME' created successfully."
+log_success "Firewall rule '$FIREWALL_RULE_NAME' created successfully."

@@ -12,14 +12,17 @@ REPO_NAME="$1"
 LOCATION="$2"
 PROJECT_ID="$3"
 
-COL_INFO="\033[0;34m"
-COL_SUCCESS="\033[0;32m"
-COL_ERROR="\033[0;31m"
-COL_RESET="\033[0m"
-
-log_info()    { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] ${COL_INFO}[INFO]${COL_RESET} $1"; }
-log_success() { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] ${COL_SUCCESS}[SUCCESS]${COL_RESET} $1"; }
-log_error()   { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] ${COL_ERROR}[ERROR]${COL_RESET} $1"; }
+# Source common logging functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./common.sh
+if [[ -f "${SCRIPT_DIR}/common.sh" ]]; then
+    source "${SCRIPT_DIR}/common.sh"
+else
+    # Fallback logging functions if common.sh is not available
+    log_info()    { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] \033[0;36m[INFO]\033[0m $1"; }
+    log_success() { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] \033[0;32m[✅ SUCCESS]\033[0m $1"; }
+    log_error()   { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] \033[0;31m[ERROR]\033[0m $1"; }
+fi
 
 # --- Usage ---
 show_usage() {

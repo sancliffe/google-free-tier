@@ -10,16 +10,27 @@ set -eo pipefail
 # Absolute path to the directory where this script is located.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# --- Functions ---
-
-# Function to log messages.
-log() {
-  echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')]: $*"
+# Source common logging functions
+# shellcheck source=./common.sh
+source "${SCRIPT_DIR}/common.sh" 2>/dev/null || {
+    # Fallback logging functions if common.sh is not available
+    log_info() {
+        echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [INFO] $*"
+    }
+    log_error() {
+        echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [ERROR] $*" >&2
+    }
+    log_success() {
+        echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [✅ SUCCESS] $*"
+    }
+    log_warn() {
+        echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [WARN] $*"
+    }
 }
 
-# Function to log errors.
-log_error() {
-  echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] ERROR: $*" >&2
+# Legacy function for backward compatibility
+log() {
+    log_info "$@"
 }
 
 declare -A config
