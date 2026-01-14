@@ -11,7 +11,7 @@ set -eo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source common logging functions
-# shellcheck source=./common.sh
+# shellcheck source=deployment/vm-setup/common.sh
 source "${SCRIPT_DIR}/common.sh" 2>/dev/null || {
     # Fallback logging functions if common.sh is not available
     log_info() {
@@ -42,10 +42,12 @@ load_and_prompt_config() {
 
     if [[ -f "${config_file}" ]]; then
         log "Sourcing configuration from ${config_file}..."
+        # shellcheck source=deployment/vm-setup/config.sh.example
         source "${config_file}"
     else
         log "WARNING: Configuration file config.sh not found."
         log "Using default values from config.sh.example and prompting for input."
+        # shellcheck source=deployment/vm-setup/config.sh.example
         source "${config_example_file}"
     fi
 
@@ -130,10 +132,10 @@ verify_gcloud_auth() {
 # --- Main ---
 
 echo ""
-echo "$(printf '=%.0s' {1..60})"
+printf '=%.0s' {1..60}; echo
 log "Starting GCP setup..."
 log "⏱️  Estimated time: 2-3 minutes"
-echo "$(printf '=%.0s' {1..60})"
+printf '=%.0s' {1..60}; echo
 echo ""
 
 # Verify required tools
@@ -196,9 +198,9 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 echo ""
-echo "$(printf '=%.0s' {1..60})"
+printf '=%.0s' {1..60}; echo
 log "🚀 Starting setup execution..."
-echo "$(printf '=%.0s' {1..60})"
+printf '=%.0s' {1..60}; echo
 
 # Execute setup scripts in order with correct filenames
 log "Step 1/5: Creating VM..."
@@ -225,12 +227,13 @@ log "Step 5/5: Creating artifact registry..."
 "${SCRIPT_DIR}/gcp-05-create-artifact-registry.sh" "${config[REPO_NAME]}" "${config[REPO_LOCATION]}" "${config[PROJECT_ID]}"
 
 echo ""
-echo "$(printf '=%.0s' {1..60})"
+printf '=%.0s' {1..60}; echo
 log "✅ GCP setup completed successfully!"
-echo "$(printf '=%.0s' {1..60})"
+printf '=%.0s' {1..60}; echo
 
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
 echo ""
 log "⏱️  Total setup time: $((DURATION / 60))m $((DURATION % 60))s"
 echo ""
+}

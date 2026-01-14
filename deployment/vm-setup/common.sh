@@ -84,6 +84,7 @@ fetch_secret() {
     script_dir=$(dirname "$(readlink -f "$0")")
     if [[ -f "$script_dir/config.sh" ]]; then
         # Source the config file in a subshell to check for the variable
+        # shellcheck source=deployment/vm-setup/config.sh.example
         secret_value=$(source "$script_dir/config.sh" 2>/dev/null && echo "${!env_var_name}")
         if [[ -n "$secret_value" ]]; then
             echo "$secret_value"
