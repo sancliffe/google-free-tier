@@ -42,140 +42,87 @@ OPTIONS:
     -l, --location REGION  The GCP region for the repository (default: ${LOCATION})
     --project-id ID        GCP project ID (or use config.sh)
     -h, --help             Show this help message
+
+EXAMPLES:
+    # Use defaults (gke-apps in us-central1)
+    $0
+
+    # Specify custom repository name and location
+    $0 --repo my-apps --location us-west1
+
+    # Specify project explicitly
+    $0 --project-id my-project-id
 EOF
 }
 
-
-
 # --- Main Logic ---
-
-
 main() {
-
-
+    # Parse arguments
     while [[ $# -gt 0 ]]; do
-
-
         case $1 in
-
             -r|--repo)
-
                 REPO_NAME="$2"
-
                 shift 2
-
-                ;; 
-
+                ;;
             -l|--location)
-
                 LOCATION="$2"
-
                 shift 2
-
-                ;; 
-
+                ;;
             --project-id)
-
                 PROJECT_ID="$2"
-
                 shift 2
-
-                ;; 
-
+                ;;
             -h|--help)
-
                 show_usage
-
                 exit 0
-
-                ;; 
-
+                ;;
             *)
-
                 log_error "Unknown option: $1"
-
                 show_usage
-
                 exit 1
-
-                ;; 
-
-esac
-
+                ;;
+        esac
     done
 
-
     # If PROJECT_ID is not set by args or config, get it from gcloud
-
     if [[ -z "${PROJECT_ID}" ]]; then
-
-        PROJECT_ID=$(command gcloud config get-value project 2>/dev/null)
-
+        PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
     fi
 
-
-
     if [[ -z "${PROJECT_ID}" ]]; then
-
-        log_error "Project ID could not be determined. Run 'gcloud config set project [ID]"'
-
+        log_error "Project ID could not be determined. Run 'gcloud config set project [ID]'"
         exit 1
-
     fi
-
-
 
     log_info "Project: ${PROJECT_ID}, Repo: ${REPO_NAME}, Location: ${LOCATION}"
 
-
-
-    # 2. Enable Required APIs
-
+    # Enable Required APIs
     log_info "Enabling Artifact Registry API..."
+    gcloud services enable artifactregistry.googleapis.com --project="${PROJECT_ID}"
 
-    command gcloud services enable artifactregistry.googleapis.com --project="${PROJECT_ID}"
-
-
-
-    # 3. Create Repository
-
+    # Create Repository
     log_info "Checking for Artifact Registry repository '${REPO_NAME}' in ${LOCATION}..."
-
-    if ! command gcloud artifacts repositories describe "${REPO_NAME}" --location="${LOCATION}" --project="${PROJECT_ID}" &>/dev/null; then
-
+    if ! gcloud artifacts repositories describe "${REPO_NAME}" \
+         --location="${LOCATION}" \
+         --project="${PROJECT_ID}" &>/dev/null; then
+        
         log_info "Creating repository..."
-
-        command gcloud artifacts repositories create "${REPO_NAME}" \
-
-            --project="${PROJECT_ID}" \
-
+        gcloud artifacts repositories create "${REPO_NAME}" \
             --repository-format=docker \
-
             --location="${LOCATION}" \
-
+            --project="${PROJECT_ID}" \
             --description="Docker repository for GKE apps"
-
+        
         log_success "Repository created."
-
     else
-
         log_info "Repository '${REPO_NAME}' already exists. Skipping creation."
-
     fi
 
-
-
-    # 4. Prepare Cleanup Policy JSON
-
+    # Prepare Cleanup Policy JSON
     log_info "Preparing cleanup policy file..."
-
-    local policy_file
-
-    policy_file=$(mktemp)
-
-    # Using a temporary file is the standard way for this gcloud command
-
-    cat <<EOF > "$policy_file"
+    POLICY_FILE=$(mktemp)
+    
+    cat > "${POLICY_FILE}" << 'EOF'
 [
   {
     "name": "keep-last-five-production",
@@ -210,50 +157,33 @@ esac
 ]
 EOF
 
-
-
-    # 5. Apply Cleanup Policy
-
+    # Apply Cleanup Policy
     log_info "Applying cleanup policies..."
-
-    command gcloud artifacts repositories set-cleanup-policies "${REPO_NAME}" \
-
+    gcloud artifacts repositories set-cleanup-policies "${REPO_NAME}" \
         --project="${PROJECT_ID}" \
-
         --location="${LOCATION}" \
-
-        --policy-from-file="$policy_file"
-
-
+        --policy="$(cat "${POLICY_FILE}")"
 
     # Clean up the temp file
-
-    rm -f "$policy_file"
-
-
+    rm -f "${POLICY_FILE}"
 
     log_success "Cleanup policies applied successfully."
 
-
-
-    # 6. Configure Docker Authentication
-
+    # Configure Docker Authentication
     log_info "Configuring Docker authentication for ${LOCATION}-docker.pkg.dev..."
-
-    command gcloud auth configure-docker "${LOCATION}-docker.pkg.dev" --quiet
-
-
+    gcloud auth configure-docker "${LOCATION}-docker.pkg.dev" --quiet
 
     echo "------------------------------------------------------------"
-
     log_success "Artifact Registry Setup Complete!"
-
     echo -e "Registry URI: ${COL_INFO}${LOCATION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}${COL_RESET}"
-
     echo "------------------------------------------------------------"
-
+    echo ""
+    log_info "Next Steps:"
+    log_info "  1. Build your Docker image:"
+    echo "     docker build -t ${LOCATION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/my-app:latest ."
+    log_info "  2. Push to Artifact Registry:"
+    echo "     docker push ${LOCATION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/my-app:latest"
+    echo "------------------------------------------------------------"
 }
-
-
 
 main "$@"
