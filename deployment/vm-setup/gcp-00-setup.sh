@@ -89,7 +89,7 @@ log "⏱️  Estimated time: 2-3 minutes"
 
 # Verify required tools
 for tool in gcloud jq; do
-    if ! command -v $tool &> /dev/null; then
+    if ! command -v "$tool" &> /dev/null; then
         log_error "Required tool '$tool' is not installed."
         exit 1
     fi
@@ -99,7 +99,7 @@ START_TIME=$(date +%s)
 load_and_prompt_config
 
 # Ensure scripts are executable
-chmod +x "${SCRIPT_DIR}"/0[1-5]-gcp-*.sh
+chmod +x "${SCRIPT_DIR}"/gcp-0[1-6]*.sh
 
 log "Checking existing resources..."
 SKIP_COUNT=0
@@ -140,18 +140,18 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
   exit 0
 fi
 
-# Execute setup scripts in order with corrected filenames
+# Execute setup scripts in order with correct filenames
 log "Step 1: Creating VM..."
-"${SCRIPT_DIR}/01-gcp-create-vm.sh" "${config[VM_NAME]}" "${config[ZONE]}" "${config[PROJECT_ID]}"
+"${SCRIPT_DIR}/gcp-01-create-vm.sh" "${config[VM_NAME]}" "${config[ZONE]}" "${config[PROJECT_ID]}"
 
 log "Step 2: Opening firewall..."
-"${SCRIPT_DIR}/02-gcp-firewall-open.sh" "${config[VM_NAME]}" "${config[ZONE]}" "${config[FIREWALL_RULE_NAME]}" "${config[PROJECT_ID]}" "${config[TAGS]}"
+"${SCRIPT_DIR}/gcp-02-firewall-open.sh" "${config[VM_NAME]}" "${config[ZONE]}" "${config[FIREWALL_RULE_NAME]}" "${config[PROJECT_ID]}" "${config[TAGS]}"
 
 log "Step 3: Setting up monitoring..."
-"${SCRIPT_DIR}/03-gcp-setup-monitoring.sh" "${config[VM_NAME]}" "${config[ZONE]}" "${config[EMAIL_ADDRESS]}" "${config[DISPLAY_NAME]}" "${config[DOMAIN]}" "${config[PROJECT_ID]}"
+"${SCRIPT_DIR}/gcp-03-setup-monitoring.sh" "${config[VM_NAME]}" "${config[ZONE]}" "${config[EMAIL_ADDRESS]}" "${config[DISPLAY_NAME]}" "${config[DOMAIN]}" "${config[PROJECT_ID]}"
 
 log "Step 4: Creating secrets..."
-"${SCRIPT_DIR}/04-gcp-create-secrets.sh" \
+"${SCRIPT_DIR}/gcp-04-create-secrets.sh" \
   --project-id "${config[PROJECT_ID]}" \
   --duckdns-token "${config[DUCKDNS_TOKEN]}" \
   --email "${config[EMAIL_ADDRESS]}" \
@@ -162,7 +162,7 @@ log "Step 4: Creating secrets..."
   --billing-account "${config[BILLING_ACCOUNT_ID]}"
 
 log "Step 5: Creating artifact registry..."
-"${SCRIPT_DIR}/05-gcp-create-artifact-registry.sh" "${config[REPO_NAME]}" "${config[REPO_LOCATION]}" "${config[PROJECT_ID]}"
+"${SCRIPT_DIR}/gcp-05-create-artifact-registry.sh" "${config[REPO_NAME]}" "${config[REPO_LOCATION]}" "${config[PROJECT_ID]}"
 
 log "GCP setup completed successfully!"
 

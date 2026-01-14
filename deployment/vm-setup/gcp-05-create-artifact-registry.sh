@@ -7,8 +7,6 @@
 set -euo pipefail
 
 # --- Configuration (with defaults) ---
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 # Arguments passed from setup-gcp.sh
 REPO_NAME="$1"
 LOCATION="$2"

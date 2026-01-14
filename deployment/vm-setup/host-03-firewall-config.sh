@@ -7,7 +7,7 @@
 
 # Resolve the directory where the script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=2-host-setup/common.sh
+# shellcheck source=./common.sh
 source "${SCRIPT_DIR}/common.sh"
 set_strict_mode
 
