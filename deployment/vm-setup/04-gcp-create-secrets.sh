@@ -78,7 +78,6 @@ create_secret() {
     CURRENT_SECRET=$((CURRENT_SECRET + 1))
 
     if [[ -z "${secret_value}" ]]; then
-        # This is not an error, just skipping creation
         log_info "[$CURRENT_SECRET/$TOTAL_SECRETS] Skipping '${secret_name}' (empty value)"
         return 0
     fi
@@ -94,21 +93,19 @@ create_secret() {
         else
             log_warn "[$CURRENT_SECRET/$TOTAL_SECRETS] Secret '${secret_name}' exists but has a different value. Adding new version..."
             echo -n "${secret_value}" | gcloud secrets versions add "${secret_name}" --data-file=- --project="${PROJECT_ID}"
-            log_success "[$CURRENT_SECRET/$TOTAL_SECRETS] Created/Updated '${secret_name}'"
+            log_success "[$CURRENT_SECRET/$TOTAL_SECRETS] Updated '${secret_name}'"
         fi
     else
         log_info "[$CURRENT_SECRET/$TOTAL_SECRETS] Creating secret: ${secret_name}"
+        # FIX: Standardized quote handling for replication policy and labels to avoid gcloud parsing errors
         echo -n "${secret_value}" | gcloud secrets create "${secret_name}" \
-            --data-file=-\
-            --replication-policy=\"automatic\"\
-            --labels=\"managed-by=script\"\
+            --data-file=- \
+            --replication-policy="automatic" \
+            --labels="managed-by=script" \
             --project="${PROJECT_ID}"
-        log_success "[$CURRENT_SECRET/$TOTAL_SECRETS] Created/Updated '${secret_name}'"
+        log_success "[$CURRENT_SECRET/$TOTAL_SECRETS] Created '${secret_name}'"
     fi
 }
-
-
-
 
 echo ""
 echo "============================================================"
