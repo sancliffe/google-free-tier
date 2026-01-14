@@ -30,8 +30,9 @@ log_info "Active Project: ${PROJECT_ID}"
 echo "$(printf '=%.0s' {1..60})"
 
 # Refresh authentication
-log_info "Refreshing authentication tokens..."
-gcloud auth application-default login --quiet 2>/dev/null || true
+# NOTE: Commented out to prevent script from pausing for user input in Cloud Shell
+# log_info "Refreshing authentication tokens..."
+# gcloud auth application-default login --quiet 2>/dev/null || true
 
 # Verify VM has monitoring scopes
 log_info "Verifying VM Access Scopes..."
