@@ -1,48 +1,55 @@
 #!/bin/bash
-#
-# Phase 5: Adjust the local firewall (UFW).
-#
-# This script opens ports for Nginx (HTTP & HTTPS) if the UFW firewall
-# is active on the VM.
+# host-03-firewall-config.sh
+# Configures UFW (Uncomplicated Firewall) on the host.
 
-# Resolve the directory where the script is located
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=./common.sh
-source "${SCRIPT_DIR}/common.sh"
-set_strict_mode
+set -e
+source "$(dirname "$0")/common.sh"
 
-main() {
-    echo ""
-    echo "$(printf '=%.0s' {1..60})"
-    log_info "Phase 5: Adjusting Local Firewall (UFW)"
-    echo "$(printf '=%.0s' {1..60})"
-    echo ""
-    ensure_root || exit 1
+echo ""
+echo "============================================================"
+log_info "Phase 5: Adjusting Local Firewall (UFW)"
+echo "============================================================"
+echo ""
 
-    # Check if ufw is installed
-    #
-    # `command -v` is a reliable way to check if a command exists.
-    if ! command -v ufw &> /dev/null; then
-        log_warn "UFW is not installed. Skipping firewall adjustment."
-        echo ""
-        exit 0
-    fi
+check_root
 
-    # Check if ufw is active
-    if ! ufw status | grep -q "Status: active"; then
-        log_warn "UFW is not active. Skipping firewall adjustment."
-        log_info "You can enable it with: sudo ufw enable"
-        echo ""
-        exit 0
-    fi
+# 1. Check if UFW is installed
+if ! command -v ufw &> /dev/null; then
+    log_warn "UFW is not installed. Installing now..."
+    wait_for_apt_lock
+    apt-get update -qq && apt-get install -y ufw -qq
+    log_success "UFW installed successfully."
+fi
 
-    log_info "Allowing 'Nginx Full' profile in UFW..."
-    # The 'Nginx Full' profile includes both port 80 (HTTP) and 443 (HTTPS).
-    # The `ufw allow` command is idempotent; it won't add a duplicate rule.
-    ufw allow 'Nginx Full'
+# 2. Reset UFW to defaults
+log_info "Resetting UFW rules to default..."
+ufw --force reset >/dev/null
 
-    log_success "Firewall rule for Nginx applied."
-    echo ""
-}
+# 3. Set Default Policies
+log_info "Setting default policies (Deny Incoming, Allow Outgoing)..."
+ufw default deny incoming
+ufw default allow outgoing
 
-main "${1:-}"
+# 4. Allow Critical Ports
+log_info "Allowing SSH (Port 22)..."
+ufw allow 22/tcp
+log_info "Rule added: Allow SSH"
+
+log_info "Allowing HTTP (Port 80)..."
+ufw allow 80/tcp
+log_info "Rule added: Allow HTTP"
+
+log_info "Allowing HTTPS (Port 443)..."
+ufw allow 443/tcp
+log_info "Rule added: Allow HTTPS"
+
+# 5. Enable UFW
+log_info "Enabling UFW..."
+# --force avoids the "Command may disrupt existing ssh connections" prompt
+ufw --force enable
+
+# 6. Verify
+log_info "Verifying Firewall Status..."
+ufw status verbose
+
+log_success "Firewall configured successfully."

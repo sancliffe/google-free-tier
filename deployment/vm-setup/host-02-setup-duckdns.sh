@@ -1,104 +1,64 @@
 #!/bin/bash
-#
-# Phase 3: Set up DuckDNS for dynamic IP updates.
+# host-02-setup-duckdns.sh
+# Sets up a cron job to update DuckDNS for dynamic IP.
 
-# Resolve the directory where the script is located
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=./common.sh
-source "${SCRIPT_DIR}/common.sh"
-set_strict_mode
+set -e
+source "$(dirname "$0")/common.sh"
 
-# --- Constants ---
-INSTALL_DIR="${HOME}/.duckdns"
-SCRIPT_FILE="${INSTALL_DIR}/update.sh"
-LOG_FILE="${INSTALL_DIR}/duck.log"
+echo ""
+echo "============================================================"
+log_info "Phase 3: Setting up DuckDNS"
+echo "============================================================"
+echo ""
 
-# Ensure the installation directory exists before any logging occurs
-mkdir -p "${INSTALL_DIR}"
+check_root
 
-# --- Main Logic ---
-main() {
-    echo ""
-    echo "$(printf '=%.0s' {1..60})"
-    log_info "Phase 3: Setting up DuckDNS"
-    echo "$(printf '=%.0s' {1..60})"
-    echo ""
+# 1. Fetch Credentials
+log_info "Fetching DuckDNS credentials..."
+DUCKDNS_DOMAIN=$(fetch_secret "duckdns_domain" "DUCKDNS_DOMAIN")
+DUCKDNS_TOKEN=$(fetch_secret "duckdns_token" "DUCKDNS_TOKEN")
 
-    # Fetch secrets from GCP Secret Manager
-    log_info "Fetching DuckDNS credentials from Secret Manager..."
-    local PROJECT_ID
-    PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
-    if [[ -z "${PROJECT_ID}" ]]; then
-        log_error "GCP project ID not found. Please configure it using 'gcloud config set project YOUR_PROJECT_ID'."
-        exit 1
-    fi
+if [[ -z "$DUCKDNS_DOMAIN" || -z "$DUCKDNS_TOKEN" ]]; then
+    log_error "Failed to retrieve DuckDNS credentials."
+    log_info "Please ensure secrets are in Secret Manager OR 'DUCKDNS_DOMAIN' and 'DUCKDNS_TOKEN' are set in config.sh."
+    exit 1
+fi
 
-    local DOMAIN
-    DOMAIN=$(gcloud secrets versions access latest --secret="domain_name" --project="${PROJECT_ID}" 2>/dev/null)
-    if [[ -z "${DOMAIN}" ]]; then
-        log_error "Failed to fetch 'domain_name' from Secret Manager. Ensure the secret exists and you have permissions."
-        exit 1
-    fi
+log_info "Configuring DuckDNS for domain: $DUCKDNS_DOMAIN"
 
-    local TOKEN
-    TOKEN=$(gcloud secrets versions access latest --secret="duckdns_token" --project="${PROJECT_ID}" 2>/dev/null)
-    if [[ -z "${TOKEN}" ]]; then
-        log_error "Failed to fetch 'duckdns_token' from Secret Manager. Ensure the secret exists and you have permissions."
-        exit 1
-    fi
+# 2. Create Script Directory
+INSTALL_DIR="/opt/duckdns"
+mkdir -p "$INSTALL_DIR"
 
-    log_success "Successfully fetched credentials."
+# 3. Create Update Script
+SCRIPT_PATH="$INSTALL_DIR/duck.sh"
+LOG_PATH="/var/log/duckdns.log"
 
-    log_info "Creating installation directory at ${INSTALL_DIR}..."
-    mkdir -p "${INSTALL_DIR}"
-
-    # No longer storing token in local file, read directly from file
-    log_info "Creating updater script: ${SCRIPT_FILE}"
-    
-    cat <<EOF > "${SCRIPT_FILE}"
+cat > "$SCRIPT_PATH" <<EOF
 #!/bin/bash
-# Auto-generated DuckDNS update script
-# Logs to: ${LOG_FILE}
-
-# This script is called by cron with the domain and token as arguments
-
-if [[ \$# -ne 2 ]]; then
-    echo "Usage: \$0 <domain> <token>"
-    exit 1
-fi
-
-DOMAIN="\$1"
-TOKEN="\$2"
-
-RESPONSE="\$(curl -s "https://www.duckdns.org/update?domains=\${DOMAIN}&token=\${TOKEN}&ip=")"
-
-if [[ "\$RESPONSE" == "OK" ]]; then
-    echo "\$(date -u +"%Y-%m-%dT%H:%M:%SZ") [OK] DuckDNS update successful: \$RESPONSE" >> "${LOG_FILE}"
-    exit 0
-else
-    echo "\$(date -u +"%Y-%m-%dT%H:%M:%SZ") [ERROR] DuckDNS update failed: \$RESPONSE" >> "${LOG_FILE}"
-    exit 1
-fi
+# Update DuckDNS
+echo url="https://www.duckdns.org/update?domains=$DUCKDNS_DOMAIN&token=$DUCKDNS_TOKEN&ip=" | curl -k -o $LOG_PATH -K -
 EOF
 
-    log_info "Setting script permissions..."
-    chmod 700 "${SCRIPT_FILE}"
+chmod +x "$SCRIPT_PATH"
+log_success "Created update script at $SCRIPT_PATH"
 
-    log_info "Running initial test..."
-    if "${SCRIPT_FILE}" "${DOMAIN}" "${TOKEN}"; then
-        log_success "DuckDNS initial update successful."
-        log_info "Setting up cron job to run every 5 minutes..."
-        
-        CRON_CMD="*/5 * * * * ${SCRIPT_FILE} '${DOMAIN}' '${TOKEN}' >> ${LOG_FILE} 2>&1"
-        # Safer cron manipulation
-        (crontab -l 2>/dev/null | grep -vF "${SCRIPT_FILE}"; echo "${CRON_CMD}") | crontab -
+# 4. Run once to verify
+log_info "Testing DuckDNS update..."
+"$SCRIPT_PATH"
 
-        log_success "Cron job successfully configured."
-    else
-        log_error "DuckDNS initial update failed. Please check your settings and the log for details: ${LOG_FILE}"
-    fi
+if grep -q "OK" "$LOG_PATH"; then
+    log_success "DuckDNS update successful (Response: OK)."
+else
+    log_warn "DuckDNS update might have failed. Check $LOG_PATH."
+    cat "$LOG_PATH"
+fi
 
-    echo ""
-}
+# 5. Setup Cron Job (Run every 5 minutes)
+CRON_JOB="*/5 * * * * $SCRIPT_PATH >/dev/null 2>&1"
+CRON_FILE="/etc/cron.d/duckdns"
 
-main "$@"
+echo "$CRON_JOB" > "$CRON_FILE"
+chmod 644 "$CRON_FILE"
+
+log_success "Cron job created at $CRON_FILE"
