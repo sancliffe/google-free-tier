@@ -82,6 +82,40 @@ load_and_prompt_config() {
     fi
 }
 
+# Function to verify gcloud authentication
+verify_gcloud_auth() {
+    log "Verifying gcloud authentication..."
+    
+    # Check if any account is authenticated
+    if ! gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | grep -q .; then
+        log_error "No active gcloud account found."
+        log_error ""
+        log_error "Please authenticate with gcloud:"
+        log_error "  $ gcloud auth login"
+        log_error ""
+        log_error "Or if you have multiple accounts, set the active one:"
+        log_error "  $ gcloud config set account YOUR_EMAIL@example.com"
+        log_error ""
+        log_error "Available accounts:"
+        gcloud auth list 2>/dev/null || echo "  (none configured)"
+        exit 1
+    fi
+    
+    # Verify project is set
+    if ! gcloud config get-value project &>/dev/null; then
+        log_error "No GCP project is configured."
+        log_error ""
+        log_error "Please set your project:"
+        log_error "  $ gcloud config set project PROJECT_ID"
+        log_error ""
+        log_error "Or list available projects:"
+        log_error "  $ gcloud projects list"
+        exit 1
+    fi
+    
+    log "✓ gcloud authentication verified"
+}
+
 # --- Main ---
 
 log "Starting GCP setup..."
@@ -94,6 +128,9 @@ for tool in gcloud jq; do
         exit 1
     fi
 done
+
+# Verify gcloud authentication before proceeding
+verify_gcloud_auth
 
 START_TIME=$(date +%s)
 load_and_prompt_config
