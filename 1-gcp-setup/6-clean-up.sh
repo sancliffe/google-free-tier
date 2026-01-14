@@ -112,7 +112,8 @@ UPTIME_CHECKS=$(gcloud monitoring uptime list-configs \
     awk '{print $1}' || true)
 
 if [[ -n "${UPTIME_CHECKS}" ]]; then
-    for CHECK_ID in ${UPTIME_CHECKS}; do
+    for CHECK_FULL_NAME in ${UPTIME_CHECKS}; do
+        CHECK_ID=$(basename "${CHECK_FULL_NAME}")
         log_info "Deleting uptime check ${CHECK_ID}..."
         if ! gcloud monitoring uptime delete "${CHECK_ID}" --project="${PROJECT_ID}" --quiet; then
             log_warn "Uptime check ${CHECK_ID} not found or already deleted."
