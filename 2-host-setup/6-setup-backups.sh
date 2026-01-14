@@ -11,6 +11,7 @@ set_strict_mode
 # --- Constants ---
 BACKUP_SCRIPT_PATH="/usr/local/bin/backup-to-gcs.sh"
 BACKUP_LOG_DIR="/var/log"
+BACKUP_CONFIG_FILE="/etc/default/backup-config"
 REGION="${REGION:-us-central1}"
 
 # --- Main Logic ---
@@ -18,19 +19,28 @@ main() {
     log_info "--- Phase 6: Setting up Automated Backups ---"
     ensure_root || exit 1
 
-    local BUCKET_NAME
-    BUCKET_NAME=$(cat /run/secrets/gcs_bucket_name)
-    local BACKUP_DIR
-    BACKUP_DIR=$(cat /run/secrets/backup_dir)
+    local BUCKET_NAME="$1"
+    local BACKUP_DIR="$2"
+
+    if [[ -z "${BUCKET_NAME}" || -z "${BACKUP_DIR}" ]]; then
+        log_info "Bucket name or backup directory not provided as arguments. Trying to read from /run/secrets..."
+        if [[ -f "/run/secrets/gcs_bucket_name" && -f "/run/secrets/backup_dir" ]]; then
+            BUCKET_NAME=${BUCKET_NAME:-$(cat /run/secrets/gcs_bucket_name)}
+            BACKUP_DIR=${BACKUP_DIR:-$(cat /run/secrets/backup_dir)}
+            log_info "Using credentials from /run/secrets."
+        fi
+    else
+        log_info "Using credentials provided as arguments."
+    fi
 
     # Validate inputs
     if [[ -z "${BUCKET_NAME}" ]]; then
-        log_error "Bucket name is empty. Ensure 'GCS_BUCKET_NAME' is set as an environment variable."
+        log_error "Bucket name is empty. Provide as an argument or ensure 'gcs_bucket_name' secret exists."
         exit 1
     fi
 
     if [[ -z "${BACKUP_DIR}" ]]; then
-        log_error "Backup directory not specified. Ensure 'BACKUP_DIR' is set as an environment variable."
+        log_error "Backup directory not specified. Provide as an argument or ensure 'backup_dir' secret exists."
         exit 1
     fi
 
@@ -39,6 +49,11 @@ main() {
         log_info "💡 Please create it first: mkdir -p ${BACKUP_DIR}"
         exit 1
     fi
+
+    log_info "Writing backup configuration to ${BACKUP_CONFIG_FILE}..."
+    echo "BUCKET_NAME=\"${BUCKET_NAME}\"" > "${BACKUP_CONFIG_FILE}"
+    echo "BACKUP_DIR=\"${BACKUP_DIR}\"" >> "${BACKUP_CONFIG_FILE}"
+    chmod 600 "${BACKUP_CONFIG_FILE}"
     
     log_info "Backup source: ${BACKUP_DIR}"
     log_info "Backup destination: gs://${BUCKET_NAME}/"
@@ -74,9 +89,15 @@ main() {
 #!/bin/bash
 set -euo pipefail
 
-# Configuration from files
-BUCKET_NAME=$(cat /run/secrets/gcs_bucket_name)
-BACKUP_DIR=$(cat /run/secrets/backup_dir)
+# Configuration from file
+CONFIG_FILE="/etc/default/backup-config"
+if [[ -f "${CONFIG_FILE}" ]]; then
+    source "${CONFIG_FILE}"
+else
+    echo "Configuration file ${CONFIG_FILE} not found." >&2
+    exit 1
+fi
+
 BACKUP_FILENAME="backup-$(date -u +"%Y-%m-%d-%H%M%S").tar.gz"
 TEMP_FILE=$(mktemp -t "${BACKUP_FILENAME}.XXXXXX")
 
@@ -215,5 +236,6 @@ EOF
     rm "${temp_cron}"
     log_success "Setup complete! Automated backups configured."
 }
+
 
 main "$@"

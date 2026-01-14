@@ -17,17 +17,30 @@ LOG_FILE="${INSTALL_DIR}/duck.log"
 main() {
     log_info "--- Phase 3: Setting up DuckDNS ---"
 
-        # Read secrets from files
-        local DOMAIN
-        DOMAIN=$(cat /run/secrets/domain_name)
-        local TOKEN
-        TOKEN=$(cat /run/secrets/duckdns_token)
+    # Fetch secrets from GCP Secret Manager
+    log_info "Fetching DuckDNS credentials from Secret Manager..."
+    local PROJECT_ID
+    PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
+    if [[ -z "${PROJECT_ID}" ]]; then
+        log_error "GCP project ID not found. Please configure it using 'gcloud config set project YOUR_PROJECT_ID'."
+        exit 1
+    fi
 
-        if [[ -z "${DOMAIN}" || -z "${TOKEN}" ]]; then
-            log_error "Required secrets not found in /run/secrets. Ensure startup script ran successfully."
-            exit 1
-        fi
-    log_info "Using credentials from environment."
+    local DOMAIN
+    DOMAIN=$(gcloud secrets versions access latest --secret="domain_name" --project="${PROJECT_ID}" 2>/dev/null)
+    if [[ -z "${DOMAIN}" ]]; then
+        log_error "Failed to fetch 'domain_name' from Secret Manager. Ensure the secret exists and you have permissions."
+        exit 1
+    fi
+
+    local TOKEN
+    TOKEN=$(gcloud secrets versions access latest --secret="duckdns_token" --project="${PROJECT_ID}" 2>/dev/null)
+    if [[ -z "${TOKEN}" ]]; then
+        log_error "Failed to fetch 'duckdns_token' from Secret Manager. Ensure the secret exists and you have permissions."
+        exit 1
+    fi
+
+    log_success "Successfully fetched credentials."
 
     log_info "Creating installation directory at ${INSTALL_DIR}..."
     mkdir -p "${INSTALL_DIR}"

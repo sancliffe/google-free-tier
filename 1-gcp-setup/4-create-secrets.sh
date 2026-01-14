@@ -1,8 +1,8 @@
+#!/bin/bash
 # --- Configuration (with defaults) ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="${SCRIPT_DIR}/config.sh"
 
-# Default values
+# Initialize variables to be populated from arguments
 DUCKDNS_TOKEN=""
 EMAIL_ADDRESS=""
 DOMAIN_NAME=""
@@ -10,14 +10,7 @@ GCS_BUCKET_NAME=""
 TF_STATE_BUCKET=""
 BACKUP_DIR="/var/www/html"
 BILLING_ACCOUNT_ID=""
-INTERACTIVE_MODE=false
 PROJECT_ID=""
-
-# Source config file if it exists
-if [[ -f "${CONFIG_FILE}" ]]; then
-    # shellcheck source=config.sh
-    source "${CONFIG_FILE}"
-fi
 
 # Source common functions if available
 if [[ -f "${SCRIPT_DIR}/../2-host-setup/common.sh" ]]; then
@@ -37,24 +30,15 @@ Usage: $0 [OPTIONS]
 Create Google Cloud Secret Manager secrets for the project.
 
 OPTIONS:
-    -t, --duckdns-token TOKEN          DuckDNS token (or use config.sh)
-    -e, --email EMAIL                  Email address for SSL notifications (or use config.sh)
-    -d, --domain DOMAIN                Domain name (e.g., mydomain.duckdns.org) (or use config.sh)
-    -b, --bucket BUCKET                GCS backup bucket name (or use config.sh)
-    -s, --tf-state-bucket BUCKET       Terraform state bucket name (or use config.sh)
+    -t, --duckdns-token TOKEN          DuckDNS token
+    -e, --email EMAIL                  Email address for SSL notifications
+    -d, --domain DOMAIN                Domain name (e.g., mydomain.duckdns.org)
+    -b, --bucket BUCKET                GCS backup bucket name
+    -s, --tf-state-bucket BUCKET       Terraform state bucket name
     -r, --backup-dir DIR               Directory to backup (default: /var/www/html)
-    -a, --billing-account ID           GCP billing account ID (or use config.sh)
-    --project-id ID                    GCP project ID (or use config.sh)
-    -i, --interactive                  Run in interactive mode (prompts for all values)
+    -a, --billing-account ID           GCP billing account ID
+    --project-id ID                    GCP project ID
     -h, --help                         Show this help message
-
-EXAMPLES:
-    # Interactive mode (prompts for all values not in config.sh)
-    $0 -i
-
-    # Provide all values as arguments, overriding config.sh
-    $0 --duckdns-token "abc123" \\
-       --email "admin@example.com"
 EOF
 }
 
@@ -69,20 +53,13 @@ while [[ $# -gt 0 ]]; do
         -r|--backup-dir)       BACKUP_DIR="$2"; shift 2;;
         -a|--billing-account)  BILLING_ACCOUNT_ID="$2"; shift 2;;
         --project-id)          PROJECT_ID="$2"; shift 2;;
-        -i|--interactive)      INTERACTIVE_MODE=true; shift;;
         -h|--help)             show_usage; exit 0;;
         *)                     log_error "Unknown option: $1"; show_usage; exit 1;;
     esac
 done
 
-# If PROJECT_ID is not set by args or config, get it from gcloud
 if [[ -z "${PROJECT_ID}" ]]; then
-    PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
-fi
-
-
-if [[ -z "${PROJECT_ID}" ]]; then
-    log_error "No active GCP project. Run: gcloud config set project PROJECT_ID"
+    log_error "No active GCP project ID provided. Use --project-id or ensure 'gcloud config set project PROJECT_ID' has been run."
     exit 1
 fi
 
@@ -122,47 +99,15 @@ create_secret() {
     else
         log_info "[$CURRENT_SECRET/$TOTAL_SECRETS] Creating secret: ${secret_name}"
         echo -n "${secret_value}" | gcloud secrets create "${secret_name}" \
-            --data-file=- \
-            --replication-policy="automatic" \
-            --labels="managed-by=script" \
+            --data-file=-\
+            --replication-policy=\"automatic\"\
+            --labels=\"managed-by=script\"\
             --project="${PROJECT_ID}"
         log_success "[$CURRENT_SECRET/$TOTAL_SECRETS] Created/Updated '${secret_name}'"
     fi
 }
 
-# Prompt for missing values if in interactive mode
-if [[ "${INTERACTIVE_MODE}" == "true" ]]; then
-    if [[ -z "${DUCKDNS_TOKEN}" ]]; then
-        read -rsp "Enter DuckDNS Token: " DUCKDNS_TOKEN_INPUT
-        DUCKDNS_TOKEN="${DUCKDNS_TOKEN_INPUT}"
-        echo
-    fi
-    if [[ -z "${EMAIL_ADDRESS}" ]]; then
-        read -rp "Enter Email Address: " EMAIL_ADDRESS_INPUT
-        EMAIL_ADDRESS="${EMAIL_ADDRESS_INPUT}"
-    fi
-    if [[ -z "${DOMAIN_NAME}" ]]; then
-        read -rp "Enter Domain Name: " DOMAIN_NAME_INPUT
-        DOMAIN_NAME="${DOMAIN_NAME_INPUT}"
-    fi
-    if [[ -z "${GCS_BUCKET_NAME}" ]]; then
-        read -rp "Enter GCS Backup Bucket Name: " GCS_BUCKET_NAME_INPUT
-        GCS_BUCKET_NAME="${GCS_BUCKET_NAME_INPUT}"
-    fi
-    if [[ -z "${TF_STATE_BUCKET}" ]]; then
-        read -rp "Enter Terraform State Bucket Name (default: ${PROJECT_ID}-tfstate): " TF_STATE_BUCKET_INPUT
-        TF_STATE_BUCKET="${TF_STATE_BUCKET_INPUT:-${PROJECT_ID}-tfstate}"
-    fi
-    if [[ -z "${BACKUP_DIR}" ]]; then
-        read -rp "Enter Backup Directory (default: /var/www/html): " BACKUP_DIR_INPUT
-        BACKUP_DIR="${BACKUP_DIR_INPUT:-/var/www/html}"
-    fi
-    if [[ -z "${BILLING_ACCOUNT_ID}" ]]; then
-        log_info "To find your billing account ID, run: gcloud billing accounts list"
-        read -rp "Enter Billing Account ID: " BILLING_ACCOUNT_ID_INPUT
-        BILLING_ACCOUNT_ID="${BILLING_ACCOUNT_ID_INPUT}"
-    fi
-fi
+
 
 
 echo ""

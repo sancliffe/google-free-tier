@@ -3,34 +3,11 @@ set -euo pipefail
 
 # --- Configuration (with defaults) ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="${SCRIPT_DIR}/config.sh"
 
-# Default values
-ZONE="us-west1-a"
-VM_NAME="free-tier-vm"
-PROJECT_ID=""
-
-# Source config file if it exists
-if [[ -f "${CONFIG_FILE}" ]]; then
-    # shellcheck source=config.sh
-    source "${CONFIG_FILE}"
-fi
-
-# --- Argument Parsing ---
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --vm-name) VM_NAME="$2"; shift 2;;
-        --zone)    ZONE="$2"; shift 2;;
-        --project-id) PROJECT_ID="$2"; shift 2;;
-        *)         echo "Unknown option: $1"; exit 1;;
-    esac
-done
-
-# If PROJECT_ID is not set by args or config, get it from gcloud
-if [[ -z "${PROJECT_ID}" ]]; then
-    PROJECT_ID=$(gcloud config get-value project)
-fi
-
+# Arguments passed from setup-gcp.sh
+VM_NAME="$1"
+ZONE="$2"
+PROJECT_ID="$3"
 
 echo "Checking if VM '$VM_NAME' already exists in project '$PROJECT_ID' zone '$ZONE'..."
 

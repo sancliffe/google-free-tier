@@ -56,18 +56,31 @@ main() {
     log_info "--- Phase 4: Setting up SSL with Let's Encrypt ---"
     ensure_root || exit 1
 
-    local DOMAIN
-    DOMAIN=$(cat /run/secrets/domain_name)
-    local EMAIL
-    EMAIL=$(cat /run/secrets/email_address)
+    local DOMAIN="$1"
+    local EMAIL="$2"
 
     if [[ -z "${DOMAIN}" || -z "${EMAIL}" ]]; then
-        log_error "Required secrets not found in /run/secrets. Ensure startup script ran successfully."
-        exit 1
+        log_info "Domain or email not provided as arguments. Trying to read from /run/secrets..."
+        if [[ -f "/run/secrets/domain_name" && -f "/run/secrets/email_address" ]]; then
+            DOMAIN=${DOMAIN:-$(cat /run/secrets/domain_name)}
+            EMAIL=${EMAIL:-$(cat /run/secrets/email_address)}
+            log_info "Using credentials from /run/secrets."
+        else
+            log_error "Required secrets not found as arguments or in /run/secrets."
+            log_info "Usage: $0 [domain] [email]"
+            exit 1
+        fi
     else
-        log_info "Using domain: ${DOMAIN}"
-        log_info "Using email: ${EMAIL}"
+        log_info "Using credentials provided as arguments."
     fi
+
+    if [[ -z "${DOMAIN}" || -z "${EMAIL}" ]]; then
+        log_error "Domain or email is empty. Please provide valid credentials."
+        exit 1
+    fi
+
+    log_info "Using domain: ${DOMAIN}"
+    log_info "Using email: ${EMAIL}"
     
     # Verify Nginx is running
     if ! systemctl is-active --quiet nginx; then

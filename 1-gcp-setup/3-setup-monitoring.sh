@@ -3,21 +3,14 @@ set -euo pipefail
 
 # --- Configuration (with defaults) ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="${SCRIPT_DIR}/config.sh"
 
-# Default values
-ZONE="us-west1-a"
-VM_NAME="free-tier-vm"
-EMAIL_ADDRESS=""
-DISPLAY_NAME="Admin"
-DOMAIN=""
-PROJECT_ID=""
-
-# Source config file if it exists
-if [[ -f "${CONFIG_FILE}" ]]; then
-    # shellcheck source=config.sh
-    source "${CONFIG_FILE}"
-fi
+# Arguments passed from setup-gcp.sh
+VM_NAME="$1"
+ZONE="$2"
+EMAIL_ADDRESS="$3"
+DISPLAY_NAME="$4"
+DOMAIN="$5"
+PROJECT_ID="$6"
 
 # Source common functions if available
 if [[ -f "${SCRIPT_DIR}/../2-host-setup/common.sh" ]]; then
@@ -29,24 +22,6 @@ else
     log_error() { echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") [ERROR] $*" >&2; }
     log_warn() { echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") [WARN] $*"; }
 fi
-
-# --- Argument Parsing ---
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --email)        EMAIL_ADDRESS="$2"; shift 2;;
-        --display-name) DISPLAY_NAME="$2"; shift 2;;
-        --domain)       DOMAIN="$2"; shift 2;;
-        --project-id)   PROJECT_ID="$2"; shift 2;;
-        *)              echo "Unknown option: $1"; exit 1;;
-    esac
-done
-
-# If PROJECT_ID is not set by args or config, get it from gcloud
-if [[ -z "${PROJECT_ID}" ]]; then
-    PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
-fi
-
-
 
 echo "------------------------------------------------------------"
 log_info "Starting GCP Monitoring Setup"
@@ -65,17 +40,6 @@ else
     log_warn "VM may need monitoring.write scope."
 fi
 
-echo "------------------------------------------------------------"
-# Prompt for user input if not provided via args or config
-if [[ -z "${EMAIL_ADDRESS}" ]]; then
-    read -rp "Enter notification email: " EMAIL_ADDRESS
-fi
-if [[ -z "${DISPLAY_NAME}" ]]; then
-    read -rp "Enter notification display name (e.g. Admin): " DISPLAY_NAME
-fi
-if [[ -z "${DOMAIN}" ]]; then
-    read -rp "Enter domain to monitor (e.g. example.com): " DOMAIN
-fi
 echo "------------------------------------------------------------"
 
 # Step 1: Create or Get Notification Channel
@@ -97,7 +61,6 @@ if [[ -z "${CHANNEL_ID}" ]]; then
 else
   log_success "Found existing channel: ${CHANNEL_ID}"
 fi
-
 # Step 2: Create or Get Uptime Check
 log_info "Step 2: Checking for existing Uptime Check for ${DOMAIN}..."
 # The gcloud command for this is not stable across versions, so we use grep.

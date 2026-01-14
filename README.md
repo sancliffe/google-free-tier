@@ -871,6 +871,9 @@ Note: If you use `core.hooksPath`, ensure the scripts inside `.git-hooks` are ex
 | Docker auth fails | Re-run: `gcloud auth configure-docker` | Phase 3 |
 | Terraform locked | Run: `terraform force-unlock LOCK_ID` | Phase 5 |
 
+### ShellCheck
+Shellcheck is used to lint the shell scripts in this project. You may see some warnings like `SC1091`, which can be safely ignored. This warning is triggered because the `config.sh` file is not checked into source control and is created by the user. The scripts are written to handle the absence of this file. All other `shellcheck` errors have been addressed.
+
 ---
 
 ### Common Terraform Errors

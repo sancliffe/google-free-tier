@@ -17,7 +17,7 @@ PASS=0
 FAIL=0
 
 # Check VM
-if gcloud compute instances describe "$VM_NAME" --zone="$ZONE" --project="$PROJECT_ID" >/dev/null; then
+if gcloud compute instances describe "$VM_NAME" --zone="$ZONE" --project="$PROJECT_ID" &>/dev/null; then
   echo "✓ VM '$VM_NAME' exists"
   PASS=$((PASS + 1))
 else
@@ -26,7 +26,7 @@ else
 fi
 
 # Check Firewall
-if gcloud compute firewall-rules describe "$FIREWALL_RULE_NAME" --project="$PROJECT_ID" >/dev/null; then
+if gcloud compute firewall-rules describe "$FIREWALL_RULE_NAME" --project="$PROJECT_ID" &>/dev/null; then
   echo "✓ Firewall rule '$FIREWALL_RULE_NAME' exists"
   PASS=$((PASS + 1))
 else
@@ -35,7 +35,7 @@ else
 fi
 
 # Check Artifact Registry
-if gcloud artifacts repositories describe "$REPO_NAME" --location="$REPO_LOCATION" --project="$PROJECT_ID" >/dev/null; then
+if gcloud artifacts repositories describe "$REPO_NAME" --location="$REPO_LOCATION" --project="$PROJECT_ID" &>/dev/null; then
   echo "✓ Artifact Registry '$REPO_NAME' exists"
   PASS=$((PASS + 1))
 else
@@ -44,7 +44,7 @@ else
 fi
 
 # Check Secrets
-SECRET_COUNT=$(gcloud secrets list --project="$PROJECT_ID" --format="value(name)" | wc -l)
+SECRET_COUNT=$(gcloud secrets list --project="$PROJECT_ID" --format="value(name)" 2>/dev/null | wc -l)
 if [[ $SECRET_COUNT -gt 0 ]]; then
   echo "✓ Found $SECRET_COUNT secrets"
   PASS=$((PASS + 1))
@@ -54,7 +54,7 @@ else
 fi
 
 # Check Monitoring
-UPTIME_COUNT=$(gcloud monitoring uptime-checks list --project="$PROJECT_ID" --format="value(name)" | wc -l)
+UPTIME_COUNT=$(gcloud monitoring uptime list-configs --project="$PROJECT_ID" --format="value(name)" 2>/dev/null | wc -l)
 if [[ $UPTIME_COUNT -gt 0 ]]; then
   echo "✓ Found $UPTIME_COUNT uptime check(s)"
   PASS=$((PASS + 1))
