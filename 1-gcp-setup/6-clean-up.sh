@@ -88,11 +88,15 @@ echo "------------------------------------------------------------"
 
 # 1. Delete VM Instance (from 1-create-vm.sh)
 log_info "Step 1: Deleting VM instance: ${VM_NAME}..."
-gcloud compute instances delete "${VM_NAME}" --zone="${ZONE}" --project="${PROJECT_ID}" --quiet || log_warn "VM ${VM_NAME} not found or already deleted."
+if ! gcloud compute instances delete "${VM_NAME}" --zone="${ZONE}" --project="${PROJECT_ID}" --quiet; then
+    log_warn "VM ${VM_NAME} not found or already deleted."
+fi
 
 # 2. Delete Firewall Rules (from 2-open-firewall.sh)
 log_info "Step 2: Deleting firewall rule: ${FIREWALL_RULE_NAME}..."
-gcloud compute firewall-rules delete "${FIREWALL_RULE_NAME}" --project="${PROJECT_ID}" --quiet || log_warn "Firewall rule ${FIREWALL_RULE_NAME} not found or already deleted."
+if ! gcloud compute firewall-rules delete "${FIREWALL_RULE_NAME}" --project="${PROJECT_ID}" --quiet; then
+    log_warn "Firewall rule ${FIREWALL_RULE_NAME} not found or already deleted."
+fi
 
 # 3. Delete Monitoring Resources (from 3-setup-monitoring.sh)
 log_info "Step 3: Deleting Uptime Checks and Alert Policies..."
@@ -101,7 +105,7 @@ log_info "Step 3: Deleting Uptime Checks and Alert Policies..."
 # A more robust solution would store created resource IDs.
 
 # Delete Uptime Checks by display name prefix
-UPTIME_CHECKS=$(gcloud monitoring uptime-checks list \
+UPTIME_CHECKS=$(gcloud monitoring uptime list-configs \
     --project="${PROJECT_ID}" \
     --filter='displayName.startsWith("Uptime check for")' \
     --format='value(name)')
@@ -109,7 +113,9 @@ UPTIME_CHECKS=$(gcloud monitoring uptime-checks list \
 if [[ -n "${UPTIME_CHECKS}" ]]; then
     for CHECK_ID in ${UPTIME_CHECKS}; do
         log_info "Deleting uptime check ${CHECK_ID}..."
-        gcloud monitoring uptime-checks delete "${CHECK_ID}" --project="${PROJECT_ID}" --quiet
+        if ! gcloud monitoring uptime delete "${CHECK_ID}" --project="${PROJECT_ID}" --quiet; then
+            log_warn "Uptime check ${CHECK_ID} not found or already deleted."
+        fi
     done
     log_success "Finished deleting uptime checks."
 else
@@ -125,7 +131,9 @@ ALERT_POLICIES=$(gcloud alpha monitoring policies list \
 if [[ -n "${ALERT_POLICIES}" ]]; then
     for POLICY_ID in ${ALERT_POLICIES}; do
         log_info "Deleting alert policy ${POLICY_ID}..."
-        gcloud alpha monitoring policies delete "${POLICY_ID}" --project="${PROJECT_ID}" --quiet
+        if ! gcloud alpha monitoring policies delete "${POLICY_ID}" --project="${PROJECT_ID}" --quiet; then
+            log_warn "Alert policy ${POLICY_ID} not found or already deleted."
+        fi
     done
     log_success "Finished deleting alert policies."
 else
@@ -145,7 +153,11 @@ SECRETS=(
 )
 for SECRET in "${SECRETS[@]}"; do
     if gcloud secrets describe "${SECRET}" --project="${PROJECT_ID}" &>/dev/null; then
-        gcloud secrets delete "${SECRET}" --project="${PROJECT_ID}" --quiet && log_success "Deleted secret: ${SECRET}"
+        if ! gcloud secrets delete "${SECRET}" --project="${PROJECT_ID}" --quiet; then
+            log_warn "Secret ${SECRET} could not be deleted."
+        else
+            log_success "Deleted secret: ${SECRET}"
+        fi
     else
         log_info "Secret ${SECRET} not found."
     fi
@@ -154,10 +166,14 @@ done
 # 5. Delete Artifact Registry Repository (from 5-create-artifact-registry.sh)
 log_info "Step 5: Deleting Artifact Registry: ${REPO_NAME}..."
 if gcloud artifacts repositories describe "${REPO_NAME}" --location="${REPO_LOCATION}" --project="${PROJECT_ID}" &>/dev/null; then
-    gcloud artifacts repositories delete "${REPO_NAME}" \
+    if ! gcloud artifacts repositories delete "${REPO_NAME}" \
         --location="${REPO_LOCATION}" \
         --project="${PROJECT_ID}" \
-        --quiet && log_success "Deleted repository: ${REPO_NAME}"
+        --quiet; then
+        log_warn "Artifact Registry repository ${REPO_NAME} could not be deleted."
+    else
+        log_success "Deleted repository: ${REPO_NAME}"
+    fi
 else
     log_info "Repository ${REPO_NAME} not found."
 fi
