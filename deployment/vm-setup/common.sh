@@ -100,7 +100,7 @@ check_root() {
     fi
 }
 
-# Alias for check_root to match function naming in some scripts
+# Alias for check_root
 ensure_root() {
     check_root
 }
@@ -133,6 +133,11 @@ wait_for_apt_lock() {
         log_info "Waiting for other apt processes to finish..."
         sleep 2
     done
+}
+
+# Alias for wait_for_apt_lock to fix script errors
+wait_for_apt() {
+    wait_for_apt_lock
 }
 
 check_disk_space() {
