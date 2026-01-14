@@ -100,6 +100,7 @@ fi
 
 # Step 2: Create or Get Uptime Check
 log_info "Step 2: Checking for existing Uptime Check for ${DOMAIN}..."
+# The gcloud command for this is not stable across versions, so we use grep.
 UPTIME_CHECK_ID=$(gcloud monitoring uptime list-configs \
   --project="${PROJECT_ID}" \
   --format='value(name,displayName)' | \
@@ -107,17 +108,63 @@ UPTIME_CHECK_ID=$(gcloud monitoring uptime list-configs \
   awk '{print $1}' || true)
 
 if [[ -z "${UPTIME_CHECK_ID}" ]]; then
-  log_info "No existing uptime check found. Creating new uptime check..."
-  UPTIME_CHECK_FULL_NAME=$(gcloud monitoring uptime create \
-    --display-name="Uptime check for ${DOMAIN}" \
-    --resource-type="uptime_url" \
-    --resource-labels="host=${DOMAIN}" \
-    --http-check="port=443,path=/,use-ssl,validate-ssl" \
-    --period=300s \
-    --timeout=10s \
-    --format="value(name)")
-    UPTIME_CHECK_ID="$UPTIME_CHECK_FULL_NAME"
-    log_success "Created Uptime Check: ${UPTIME_CHECK_ID}"
+  log_info "No existing uptime check found. Creating new uptime check via API..."
+
+  # Install jq if not present (for JSON parsing)
+  if ! command -v jq &> /dev/null; then
+      log_info "Installing jq for JSON parsing..."
+      sudo apt-get update -qq && sudo apt-get install -y jq -qq
+  fi
+
+  # Create a temporary JSON file for the uptime check configuration
+  UPTIME_CONFIG=$(mktemp)
+  cat > "${UPTIME_CONFIG}" << EOF
+{
+  "displayName": "Uptime check for ${DOMAIN}",
+  "monitoredResource": {
+    "type": "uptime_url",
+    "labels": {
+      "host": "${DOMAIN}"
+    }
+  },
+  "httpCheck": {
+    "path": "/",
+    "port": 443,
+    "useSsl": true,
+    "validateSsl": true
+  },
+  "period": "300s",
+  "timeout": "10s"
+}
+EOF
+
+  # Get access token
+  ACCESS_TOKEN=$(gcloud auth print-access-token)
+
+  # Create uptime check via API
+  UPTIME_RESPONSE=$(curl -s -X POST \
+    "https://monitoring.googleapis.com/v3/projects/${PROJECT_ID}/uptimeCheckConfigs" \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d @"${UPTIME_CONFIG}")
+
+  rm -f "${UPTIME_CONFIG}"
+
+  # Check for errors in response
+  if echo "${UPTIME_RESPONSE}" | jq -e '.error' > /dev/null 2>&1; then
+      log_error "API Error: $(echo "${UPTIME_RESPONSE}" | jq -r '.error.message')"
+      log_error "Full response: ${UPTIME_RESPONSE}"
+      exit 1
+  fi
+
+  # Extract the uptime check name/ID using jq
+  UPTIME_CHECK_ID=$(echo "${UPTIME_RESPONSE}" | jq -r '.name // empty')
+
+  if [[ -z "${UPTIME_CHECK_ID}" ]]; then
+      log_error "Failed to create uptime check. Response: ${UPTIME_RESPONSE}"
+      exit 1
+  fi
+  log_success "Created Uptime Check: ${UPTIME_CHECK_ID}"
 else
     log_success "Found existing uptime check: ${UPTIME_CHECK_ID}"
 fi
