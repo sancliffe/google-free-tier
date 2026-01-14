@@ -107,8 +107,9 @@ log_info "Step 3: Deleting Uptime Checks and Alert Policies..."
 # Delete Uptime Checks by display name prefix
 UPTIME_CHECKS=$(gcloud monitoring uptime list-configs \
     --project="${PROJECT_ID}" \
-    --filter='displayName.startsWith("Uptime check for")' \
-    --format='value(name)')
+    --format='value(name,displayName)' | \
+    grep "Uptime check for" | \
+    awk '{print $1}' || true)
 
 if [[ -n "${UPTIME_CHECKS}" ]]; then
     for CHECK_ID in ${UPTIME_CHECKS}; do
@@ -125,8 +126,9 @@ fi
 # Delete Alert Policies by display name prefix
 ALERT_POLICIES=$(gcloud alpha monitoring policies list \
     --project="${PROJECT_ID}" \
-    --filter='displayName.startsWith("Uptime Check Alert for")' \
-    --format='value(name)')
+    --format='value(name,displayName)' | \
+    grep "Uptime Check Alert for" | \
+    awk '{print $1}' || true)
 
 if [[ -n "${ALERT_POLICIES}" ]]; then
     for POLICY_ID in ${ALERT_POLICIES}; do
