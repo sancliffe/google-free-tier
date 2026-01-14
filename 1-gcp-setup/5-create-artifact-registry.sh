@@ -117,7 +117,7 @@ esac
 
     if [[ -z "${PROJECT_ID}" ]]; then
 
-        log_error "Project ID could not be determined. Run 'gcloud config set project [ID]'"
+        log_error "Project ID could not be determined. Run 'gcloud config set project [ID]"'
 
         exit 1
 
