@@ -69,12 +69,12 @@ EOF
     fi
 
     # Prepare Cleanup Policy JSON
+    # UPDATED: Removed the outer "rules": { ... } wrapper to comply with gcloud requirements.
     log_info "Preparing cleanup policy file..."
     POLICY_FILE=$(mktemp)
     
     cat > "${POLICY_FILE}" << 'EOF'
-{
-  "rules": [
+[
     {
       "name": "keep-last-five-production",
       "action": {
@@ -111,8 +111,7 @@ EOF
         "olderThan": "604800s"
       }
     }
-  ]
-}
+]
 EOF
 
     # Apply Cleanup Policy
