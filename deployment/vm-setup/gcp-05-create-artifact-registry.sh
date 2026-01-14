@@ -14,7 +14,7 @@ PROJECT_ID="$3"
 
 # Source common logging functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=./common.sh
+# shellcheck disable=SC1091
 if [[ -f "${SCRIPT_DIR}/common.sh" ]]; then
     source "${SCRIPT_DIR}/common.sh"
 else
@@ -48,10 +48,10 @@ EOF
     fi
 
     echo ""
-    echo "$(printf '=%.0s' {1..60})"
+    printf '=%.0s' {1..60}; echo
     log_info "Artifact Registry Setup"
     log_info "Project: ${PROJECT_ID} | Repo: ${REPO_NAME} | Location: ${LOCATION}"
-    echo "$(printf '=%.0s' {1..60})"
+    printf '=%.0s' {1..60}; echo
     echo ""
 
     # Enable Required APIs
@@ -142,9 +142,9 @@ EOF
     gcloud auth configure-docker "${LOCATION}-docker.pkg.dev" --quiet
 
     echo ""
-    echo "$(printf '=%.0s' {1..60})"
+    printf '=%.0s' {1..60}; echo
     log_success "Artifact Registry Setup Complete!"
-    echo "$(printf '=%.0s' {1..60})"
+    printf '=%.0s' {1..60}; echo
     echo ""
     log_info "Registry URI:"
     log_info "  ${LOCATION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}"
@@ -155,3 +155,4 @@ EOF
     log_info "  2. Push to Artifact Registry:"
     echo "     docker push ${LOCATION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/my-app:latest"
     echo "------------------------------------------------------------"
+}

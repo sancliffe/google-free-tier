@@ -3,6 +3,7 @@
 # Configures UFW (Uncomplicated Firewall) on the host.
 
 set -e
+# shellcheck disable=SC1091
 source "$(dirname "$0")/common.sh"
 
 echo ""

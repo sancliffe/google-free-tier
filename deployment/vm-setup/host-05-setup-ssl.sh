@@ -4,7 +4,7 @@
 
 # Resolve the directory where the script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=./common.sh
+# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/common.sh"
 set_strict_mode
 
@@ -66,9 +66,9 @@ check_dns() {
 # --- Main Logic ---
 main() {
     echo ""
-    echo "$(printf '=%.0s' {1..60})"
+    printf '=%.0s' {1..60}; echo
     log_info "Phase 4: Setting up SSL with Let's Encrypt"
-    echo "$(printf '=%.0s' {1..60})"
+    printf '=%.0s' {1..60}; echo
     echo ""
     ensure_root || exit 1
 

@@ -3,6 +3,7 @@
 # Sets up a cron job to update DuckDNS for dynamic IP.
 
 set -e
+# shellcheck disable=SC1091
 source "$(dirname "$0")/common.sh"
 
 echo ""

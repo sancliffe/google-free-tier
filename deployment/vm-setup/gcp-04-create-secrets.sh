@@ -13,8 +13,9 @@ BILLING_ACCOUNT_ID=""
 PROJECT_ID=""
 
 # Source common functions if available
-if [[ -f "${SCRIPT_DIR}/./common.sh" ]]; then
-    source "${SCRIPT_DIR}/./common.sh"
+# shellcheck disable=SC1091
+if [[ -f "${SCRIPT_DIR}/common.sh" ]]; then
+    source "${SCRIPT_DIR}/common.sh"
 else
     log_info() { echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") [INFO] $*"; }
     log_success() { echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") [SUCCESS] $*"; }
@@ -64,9 +65,9 @@ if [[ -z "${PROJECT_ID}" ]]; then
 fi
 
 echo ""
-echo "$(printf '=%.0s' {1..60})"
+printf '=%.0s' {1..60}; echo
 log_info "Creating Secrets in Project: ${PROJECT_ID}"
-echo "$(printf '=%.0s' {1..60})"
+printf '=%.0s' {1..60}; echo
 
 TOTAL_SECRETS=7
 CURRENT_SECRET=0
@@ -121,9 +122,9 @@ create_secret "backup_dir" "${BACKUP_DIR}"
 create_secret "billing_account_id" "${BILLING_ACCOUNT_ID}"
 
 echo ""
-echo "$(printf '=%.0s' {1..60})"
+printf '=%.0s' {1..60}; echo
 log_success "Secrets creation complete!"
-echo "$(printf '=%.0s' {1..60})"
+printf '=%.0s' {1..60}; echo
 echo ""
 log_info "View secrets: gcloud secrets list --project=${PROJECT_ID}"
 log_info "Read secret: gcloud secrets versions access latest --secret=SECRET_NAME --project=${PROJECT_ID}"

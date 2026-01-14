@@ -18,7 +18,7 @@ PROJECT_ID=""
 
 # Source config file if it exists
 if [[ -f "${CONFIG_FILE}" ]]; then
-    # shellcheck source=config.sh
+    # shellcheck disable=SC1090
     source "${CONFIG_FILE}"
 fi
 
@@ -56,7 +56,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Source common logging functions
-# shellcheck source=./common.sh
+# shellcheck disable=SC1091
 if [[ -f "${SCRIPT_DIR}/common.sh" ]]; then
     source "${SCRIPT_DIR}/common.sh"
 else

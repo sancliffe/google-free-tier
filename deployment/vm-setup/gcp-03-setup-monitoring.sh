@@ -13,8 +13,9 @@ DOMAIN="$5"
 PROJECT_ID="$6"
 
 # Source common functions if available
-if [[ -f "${SCRIPT_DIR}/./common.sh" ]]; then
-    source "${SCRIPT_DIR}/./common.sh"
+# shellcheck disable=SC1091
+if [[ -f "${SCRIPT_DIR}/common.sh" ]]; then
+    source "${SCRIPT_DIR}/common.sh"
 else
     # Minimal logging functions if common.sh not available
     log_info() { echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") [INFO] $*"; }
@@ -24,10 +25,10 @@ else
 fi
 
 echo ""
-echo "$(printf '=%.0s' {1..60})"
+printf '=%.0s' {1..60}; echo
 log_info "Starting GCP Monitoring Setup"
 log_info "Active Project: ${PROJECT_ID}"
-echo "$(printf '=%.0s' {1..60})"
+printf '=%.0s' {1..60}; echo
 
 # Refresh authentication
 # NOTE: Commented out to prevent script from pausing for user input in Cloud Shell
@@ -187,9 +188,9 @@ else
 fi
 
 echo ""
-echo "$(printf '=%.0s' {1..60})"
+printf '=%.0s' {1..60}; echo
 log_success "Monitoring Setup Complete!"
-echo "$(printf '=%.0s' {1..60})"
+printf '=%.0s' {1..60}; echo
 log_info "Summary:"
 log_info "  • Notification Channel: ${CHANNEL_ID}"
 log_info "  • Uptime Check: ${UPTIME_CHECK_ID}"

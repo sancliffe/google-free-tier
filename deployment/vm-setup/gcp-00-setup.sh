@@ -11,7 +11,7 @@ set -eo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source common logging functions
-# shellcheck source=./common.sh
+# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/common.sh" 2>/dev/null || {
     # Fallback logging functions if common.sh is not available
     log_info() {
@@ -42,12 +42,12 @@ load_and_prompt_config() {
 
     if [[ -f "${config_file}" ]]; then
         log "Sourcing configuration from ${config_file}..."
-        # shellcheck source=./config.sh.example
+        # shellcheck disable=SC1091
         source "${config_file}"
     else
         log "WARNING: Configuration file config.sh not found."
         log "Using default values from config.sh.example and prompting for input."
-        # shellcheck source=./config.sh.example
+        # shellcheck disable=SC1091
         source "${config_example_file}"
     fi
 

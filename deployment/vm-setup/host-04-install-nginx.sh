@@ -3,6 +3,7 @@
 # Installs and configures Nginx with basic optimizations for e2-micro.
 
 set -e
+# shellcheck disable=SC1091
 source "$(dirname "$0")/common.sh"
 
 echo ""
