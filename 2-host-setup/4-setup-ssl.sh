@@ -87,6 +87,23 @@ main() {
         log_error "Nginx is not running. Please install and start Nginx first."
         exit 1
     fi
+
+    # Install dnsutils if not present
+    if ! command -v dig &> /dev/null; then
+        log_info "dnsutils (for 'dig' command) is not installed. Installing now..."
+        wait_for_apt
+        if ! apt-get update -qq; then
+            log_error "Failed to update package lists."
+            exit 1
+        fi
+        if ! apt-get install -y -qq dnsutils; then
+            log_error "Failed to install dnsutils."
+            exit 1
+        fi
+        log_success "dnsutils installed successfully."
+    else
+        log_success "dnsutils is already installed."
+    fi
     
     # Check/install Certbot
     if ! command -v certbot &> /dev/null; then
