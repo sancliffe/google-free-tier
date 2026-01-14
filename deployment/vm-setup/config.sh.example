@@ -47,6 +47,6 @@ export DUCKDNS_TOKEN=""
 export GCS_BUCKET_NAME=""
 export TF_STATE_BUCKET=""
 export BACKUP_DIR="/var/www/html"
-export BILLING_ACCOUNT_ID="${BILLING_ACCOUNT_ID:-$(gcloud billing accounts list --format='value(accountId)' --limit=1 2>/dev/null)}"
+export BILLING_ACCOUNT_ID="${BILLING_ACCOUNT_ID:-$(gcloud billing accounts list --format='value(name)' --limit=1 2>/dev/null)}"
 
 # --- End of Configuration ---
