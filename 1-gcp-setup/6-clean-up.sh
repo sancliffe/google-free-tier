@@ -4,74 +4,148 @@
 
 set -euo pipefail
 
-# --- Configuration (Matching original setup scripts) ---
-PROJECT_ID=$(gcloud config get-value project)
+# --- Configuration (with defaults) ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="${SCRIPT_DIR}/config.sh"
+
+# Default values
 ZONE="us-west1-a"
 VM_NAME="free-tier-vm"
+FIREWALL_RULE_NAME="allow-http-https"
 REPO_NAME="gke-apps"
 REPO_LOCATION="us-central1"
+PROJECT_ID=""
+
+# Source config file if it exists
+if [[ -f "${CONFIG_FILE}" ]]; then
+    # shellcheck source=config.sh
+    source "${CONFIG_FILE}"
+fi
+
+
+# --- Usage ---
+show_usage() {
+    cat << EOF
+Usage: $0 [OPTIONS]
+
+Deletes the GCP resources created by the setup scripts.
+
+OPTIONS:
+    --vm-name NAME         The name of the VM to delete (default: ${VM_NAME})
+    --zone ZONE            The GCP zone of the VM (default: ${ZONE})
+    --firewall-rule-name NAME The name of the firewall rule to delete (default: ${FIREWALL_RULE_NAME})
+    --repo-name NAME       The Artifact Registry repo name (default: ${REPO_NAME})
+    --repo-location REGION The repo's GCP region (default: ${REPO_LOCATION})
+    --project-id ID        GCP project ID (or use config.sh)
+    -h, --help             Show this help message
+EOF
+}
+
+# --- Argument Parsing ---
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --vm-name)         VM_NAME="$2"; shift 2;;
+        --zone)            ZONE="$2"; shift 2;;
+        --firewall-rule-name) FIREWALL_RULE_NAME="$2"; shift 2;;
+        --repo-name)       REPO_NAME="$2"; shift 2;;
+        --repo-location)   REPO_LOCATION="$2"; shift 2;;
+        --project-id)      PROJECT_ID="$2"; shift 2;;
+        -h|--help)         show_usage; exit 0;;
+        *)                 echo "Unknown option: $1"; show_usage; exit 1;;
+    esac
+done
+
+# If PROJECT_ID is not set by args or config, get it from gcloud
+if [[ -z "${PROJECT_ID}" ]]; then
+    PROJECT_ID=$(gcloud config get-value project)
+fi
+
 
 # Logging Helpers
 log_info()    { echo -e "\033[0;34m[INFO]\033[0m $*"; }
 log_success() { echo -e "\033[0;32m[SUCCESS]\033[0m $*"; }
 log_warn()    { echo -e "\033[0;33m[WARN]\033[0m $*"; }
+log_error()   { echo -e "\033[0;31m[ERROR]\033[0m $*"; }
+
 
 echo "------------------------------------------------------------"
 log_info "Starting Cleanup for Project: ${PROJECT_ID}"
 echo "------------------------------------------------------------"
+log_warn "This script will PERMANENTLY DELETE the following resources:"
+log_warn "  - VM Instance: ${VM_NAME} in ${ZONE}"
+log_warn "  - Firewall Rule: ${FIREWALL_RULE_NAME}"
+log_warn "  - Monitoring Resources (Uptime Checks, Alert Policies)"
+log_warn "  - Secret Manager Secrets"
+log_warn "  - Artifact Registry Repo: ${REPO_NAME} in ${REPO_LOCATION}"
+echo "------------------------------------------------------------"
+read -rp "Are you sure you want to continue? (y/N): " CONFIRM
+if [[ "${CONFIRM}" != "y" ]]; then
+    log_info "Cleanup cancelled."
+    exit 0
+fi
+echo "------------------------------------------------------------"
+
 
 # 1. Delete VM Instance (from 1-create-vm.sh)
 log_info "Step 1: Deleting VM instance: ${VM_NAME}..."
-gcloud compute instances delete "${VM_NAME}" --zone="${ZONE}" --quiet || log_warn "VM ${VM_NAME} not found or already deleted."
+gcloud compute instances delete "${VM_NAME}" --zone="${ZONE}" --project="${PROJECT_ID}" --quiet || log_warn "VM ${VM_NAME} not found or already deleted."
 
 # 2. Delete Firewall Rules (from 2-open-firewall.sh)
-log_info "Step 2: Deleting firewall rules: allow-http, allow-https..."
-gcloud compute firewall-rules delete allow-http allow-https --quiet || log_warn "Firewall rules not found or already deleted."
+log_info "Step 2: Deleting firewall rule: ${FIREWALL_RULE_NAME}..."
+gcloud compute firewall-rules delete "${FIREWALL_RULE_NAME}" --project="${PROJECT_ID}" --quiet || log_warn "Firewall rule ${FIREWALL_RULE_NAME} not found or already deleted."
 
 # 3. Delete Monitoring Resources (from 3-setup-monitoring.sh)
 log_info "Step 3: Deleting Uptime Checks and Alert Policies..."
 
-# Delete Uptime Checks
-# Using 'monitoring uptime list-configs' as per updated gcloud CLI choice
-UPTIME_IDS=$(gcloud monitoring uptime list-configs --format="value(name)" 2>/dev/null || echo "")
-if [[ -n "$UPTIME_IDS" ]]; then
-    for ID in $UPTIME_IDS; do
-        DISPLAY_NAME=$(gcloud monitoring uptime describe "$ID" --format="value(displayName)" 2>/dev/null || echo "")
-        if [[ "$DISPLAY_NAME" == *"Uptime check for"* ]]; then
-            gcloud monitoring uptime delete "$ID" --quiet && log_success "Deleted Uptime Check: $DISPLAY_NAME"
-        fi
+# Note: This is not perfectly reliable if you have multiple checks with similar names.
+# A more robust solution would store created resource IDs.
+
+# Delete Uptime Checks by display name prefix
+UPTIME_CHECKS=$(gcloud monitoring uptime-checks list \
+    --project="${PROJECT_ID}" \
+    --filter='displayName.startsWith("Uptime check for")' \
+    --format='value(name)')
+
+if [[ -n "${UPTIME_CHECKS}" ]]; then
+    for CHECK_ID in ${UPTIME_CHECKS}; do
+        log_info "Deleting uptime check ${CHECK_ID}..."
+        gcloud monitoring uptime-checks delete "${CHECK_ID}" --project="${PROJECT_ID}" --quiet
     done
+    log_success "Finished deleting uptime checks."
 else
-    log_info "No uptime checks found."
+    log_info "No matching uptime checks found to delete."
 fi
 
-# Delete Alert Policies
-ALERT_IDS=$(gcloud monitoring policies list --format="value(name)" 2>/dev/null || echo "")
-if [[ -n "$ALERT_IDS" ]]; then
-    for ID in $ALERT_IDS; do
-        DISPLAY_NAME=$(gcloud monitoring policies describe "$ID" --format="value(displayName)" 2>/dev/null || echo "")
-        if [[ "$DISPLAY_NAME" == *"Uptime Check Alert"* ]]; then
-            gcloud monitoring policies delete "$ID" --quiet && log_success "Deleted Alert Policy: $DISPLAY_NAME"
-        fi
+# Delete Alert Policies by display name prefix
+ALERT_POLICIES=$(gcloud alpha monitoring policies list \
+    --project="${PROJECT_ID}" \
+    --filter='displayName.startsWith("Uptime Check Alert for")' \
+    --format='value(name)')
+
+if [[ -n "${ALERT_POLICIES}" ]]; then
+    for POLICY_ID in ${ALERT_POLICIES}; do
+        log_info "Deleting alert policy ${POLICY_ID}..."
+        gcloud alpha monitoring policies delete "${POLICY_ID}" --project="${PROJECT_ID}" --quiet
     done
+    log_success "Finished deleting alert policies."
 else
-    log_info "No alert policies found."
+    log_info "No matching alert policies found to delete."
 fi
 
 # 4. Delete Secret Manager Secrets (from 4-create-secrets.sh)
 log_info "Step 4: Deleting secrets..."
 SECRETS=(
-    "duckdns_token" 
-    "email_address" 
-    "domain_name" 
-    "gcs_bucket_name" 
-    "tf_state_bucket" 
-    "backup_dir" 
+    "duckdns_token"
+    "email_address"
+    "domain_name"
+    "gcs_bucket_name"
+    "tf_state_bucket"
+    "backup_dir"
     "billing_account_id"
 )
 for SECRET in "${SECRETS[@]}"; do
-    if gcloud secrets describe "${SECRET}" &>/dev/null; then
-        gcloud secrets delete "${SECRET}" --quiet && log_success "Deleted secret: ${SECRET}"
+    if gcloud secrets describe "${SECRET}" --project="${PROJECT_ID}" &>/dev/null; then
+        gcloud secrets delete "${SECRET}" --project="${PROJECT_ID}" --quiet && log_success "Deleted secret: ${SECRET}"
     else
         log_info "Secret ${SECRET} not found."
     fi
@@ -79,9 +153,10 @@ done
 
 # 5. Delete Artifact Registry Repository (from 5-create-artifact-registry.sh)
 log_info "Step 5: Deleting Artifact Registry: ${REPO_NAME}..."
-if gcloud artifacts repositories describe "${REPO_NAME}" --location="${REPO_LOCATION}" &>/dev/null; then
+if gcloud artifacts repositories describe "${REPO_NAME}" --location="${REPO_LOCATION}" --project="${PROJECT_ID}" &>/dev/null; then
     gcloud artifacts repositories delete "${REPO_NAME}" \
         --location="${REPO_LOCATION}" \
+        --project="${PROJECT_ID}" \
         --quiet && log_success "Deleted repository: ${REPO_NAME}"
 else
     log_info "Repository ${REPO_NAME} not found."

@@ -1,24 +1,66 @@
 #!/bin/bash
+set -euo pipefail
 
-# 1. Define your Project ID
-PROJECT_ID=$(gcloud config get-value project)
+# --- Configuration (with defaults) ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="${SCRIPT_DIR}/config.sh"
+
+# Default values
 ZONE="us-west1-a"
 VM_NAME="free-tier-vm"
+PROJECT_ID=""
 
-# 2. Automatically fetch the Project Number for the dynamic Service Account
-PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+# Source config file if it exists
+if [[ -f "${CONFIG_FILE}" ]]; then
+    # shellcheck source=config.sh
+    source "${CONFIG_FILE}"
+fi
+
+# --- Argument Parsing ---
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --vm-name) VM_NAME="$2"; shift 2;;
+        --zone)    ZONE="$2"; shift 2;;
+        --project-id) PROJECT_ID="$2"; shift 2;;
+        *)         echo "Unknown option: $1"; exit 1;;
+    esac
+done
+
+# If PROJECT_ID is not set by args or config, get it from gcloud
+if [[ -z "${PROJECT_ID}" ]]; then
+    PROJECT_ID=$(gcloud config get-value project)
+fi
+
+
+echo "Checking if VM '$VM_NAME' already exists in project '$PROJECT_ID' zone '$ZONE'..."
+
+if gcloud compute instances describe "$VM_NAME" --project="$PROJECT_ID" --zone="$ZONE" &>/dev/null; then
+  echo "VM '$VM_NAME' already exists. Exiting."
+  exit 0
+fi
+
+echo "VM '$VM_NAME' does not exist. Proceeding with creation."
+
+# 2. Automatically fetch the Project Number for the dynamic Service Account.
+#    This service account is created by default for Compute Engine instances.
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
 SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 
-# 3. Execute the creation command
-gcloud compute instances create $VM_NAME \
-    --project=$PROJECT_ID \
-    --zone=$ZONE \
+# 3. Execute the creation command.
+#    - e2-micro is part of Google Cloud's free tier.
+#    - debian-12 is a common, stable Linux distribution.
+echo "Creating VM '$VM_NAME'..."
+gcloud compute instances create "$VM_NAME" \
+    --project="$PROJECT_ID" \
+    --zone="$ZONE" \
     --machine-type=e2-micro \
     --network-interface=network-tier=STANDARD,stack-type=IPV4_ONLY,subnet=default \
     --maintenance-policy=MIGRATE \
-    --service-account=$SERVICE_ACCOUNT \
+    --service-account="$SERVICE_ACCOUNT" \
     --scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/pubsub,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/trace.append \
     --create-disk=auto-delete=yes,boot=yes,device-name=persistent-disk-0,image-family=debian-12,image-project=debian-cloud,mode=rw,size=30,type=pd-standard \
     --no-shielded-secure-boot \
     --shielded-vtpm \
     --shielded-integrity-monitoring
+
+echo "VM '$VM_NAME' created successfully."

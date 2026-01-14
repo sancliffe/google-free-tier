@@ -9,6 +9,7 @@ npm-debug.log
 
 # Local Secrets (if any)
 .env
+/1-gcp-setup/config.sh
 
 # Google Cloud Service Accounts
 *.json

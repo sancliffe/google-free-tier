@@ -1,8 +1,25 @@
 #!/bin/bash
 set -euo pipefail
 
-# Source common functions if available
+# --- Configuration (with defaults) ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="${SCRIPT_DIR}/config.sh"
+
+# Default values
+ZONE="us-west1-a"
+VM_NAME="free-tier-vm"
+EMAIL_ADDRESS=""
+DISPLAY_NAME="Admin"
+DOMAIN=""
+PROJECT_ID=""
+
+# Source config file if it exists
+if [[ -f "${CONFIG_FILE}" ]]; then
+    # shellcheck source=config.sh
+    source "${CONFIG_FILE}"
+fi
+
+# Source common functions if available
 if [[ -f "${SCRIPT_DIR}/../2-host-setup/common.sh" ]]; then
     source "${SCRIPT_DIR}/../2-host-setup/common.sh"
 else
@@ -13,8 +30,23 @@ else
     log_warn() { echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") [WARN] $*"; }
 fi
 
-# Configuration
-PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
+# --- Argument Parsing ---
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --email)        EMAIL_ADDRESS="$2"; shift 2;;
+        --display-name) DISPLAY_NAME="$2"; shift 2;;
+        --domain)       DOMAIN="$2"; shift 2;;
+        --project-id)   PROJECT_ID="$2"; shift 2;;
+        *)              echo "Unknown option: $1"; exit 1;;
+    esac
+done
+
+# If PROJECT_ID is not set by args or config, get it from gcloud
+if [[ -z "${PROJECT_ID}" ]]; then
+    PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
+fi
+
+
 
 echo "------------------------------------------------------------"
 log_info "Starting GCP Monitoring Setup"
@@ -27,106 +59,90 @@ gcloud auth application-default login --quiet 2>/dev/null || true
 
 # Verify VM has monitoring scopes
 log_info "Verifying VM Access Scopes..."
-if gcloud compute instances describe "$(hostname)" --zone="$(curl -s http://metadata.google.internal/computeMetadata/v1/instance/zone -H "Metadata-Flavor: Google" | cut -d/ -f4)" --format="get(serviceAccounts[0].scopes)" 2>/dev/null | grep -q "monitoring"; then
+if gcloud compute instances describe "${VM_NAME}" --zone="${ZONE}" --format="get(serviceAccounts[0].scopes)" 2>/dev/null | grep -q "monitoring"; then
     log_success "Scopes verified."
 else
     log_warn "VM may need monitoring.write scope."
 fi
 
 echo "------------------------------------------------------------"
-# Prompt for user input
-read -rp "Enter notification email: " EMAIL_ADDRESS
-read -rp "Enter notification display name (e.g. Admin): " DISPLAY_NAME
-read -rp "Enter domain to monitor (e.g. example.com): " DOMAIN
+# Prompt for user input if not provided via args or config
+if [[ -z "${EMAIL_ADDRESS}" ]]; then
+    read -rp "Enter notification email: " EMAIL_ADDRESS
+fi
+if [[ -z "${DISPLAY_NAME}" ]]; then
+    read -rp "Enter notification display name (e.g. Admin): " DISPLAY_NAME
+fi
+if [[ -z "${DOMAIN}" ]]; then
+    read -rp "Enter domain to monitor (e.g. example.com): " DOMAIN
+fi
 echo "------------------------------------------------------------"
 
-# Step 1: Create Notification Channel
-log_info "Step 1: Creating Notification Channel..."
-CHANNEL_ID=$(gcloud alpha monitoring channels create \
-  --display-name="${DISPLAY_NAME}" \
-  --type=email \
-  --channel-labels=email_address="${EMAIL_ADDRESS}" \
+# Step 1: Create or Get Notification Channel
+log_info "Step 1: Checking for existing Notification Channel..."
+CHANNEL_ID=$(gcloud alpha monitoring channels list \
+  --filter="displayName=\"${DISPLAY_NAME}\" AND type=\"email\"" \
   --format="value(name)")
 
-log_success "Created Channel: ${CHANNEL_ID}"
-log_warn "Check ${EMAIL_ADDRESS} for a verification email before proceeding."
-read -rp "Press [Enter] to continue..."
-
-# Step 2: Create Uptime Check using API
-log_info "Step 2: Creating Uptime Check for ${DOMAIN}..."
-
-# Install jq if not present (for JSON parsing)
-if ! command -v jq &> /dev/null; then
-    log_info "Installing jq for JSON parsing..."
-    sudo apt-get update -qq && sudo apt-get install -y jq -qq
+if [[ -z "${CHANNEL_ID}" ]]; then
+  log_info "No existing channel found. Creating new channel..."
+  CHANNEL_ID=$(gcloud alpha monitoring channels create \
+    --display-name="${DISPLAY_NAME}" \
+    --type=email \
+    --channel-labels=email_address="${EMAIL_ADDRESS}" \
+    --format="value(name)")
+  log_success "Created Channel: ${CHANNEL_ID}"
+  log_warn "Check ${EMAIL_ADDRESS} for a verification email before proceeding."
+  read -rp "Press [Enter] to continue after verifying..."
+else
+  log_success "Found existing channel: ${CHANNEL_ID}"
 fi
 
-# Create a temporary JSON file for the uptime check configuration
-UPTIME_CONFIG=$(mktemp)
-cat > "${UPTIME_CONFIG}" << EOF
-{
-  "displayName": "Uptime check for ${DOMAIN}",
-  "monitoredResource": {
-    "type": "uptime_url",
-    "labels": {
-      "host": "${DOMAIN}"
-    }
-  },
-  "httpCheck": {
-    "path": "/",
-    "port": 443,
-    "useSsl": true,
-    "validateSsl": true
-  },
-  "period": "300s",
-  "timeout": "10s"
-}
-EOF
-
-# Get access token
-ACCESS_TOKEN=$(gcloud auth print-access-token)
-
-# Create uptime check via API
-UPTIME_RESPONSE=$(curl -s -X POST \
-  "https://monitoring.googleapis.com/v3/projects/${PROJECT_ID}/uptimeCheckConfigs" \
-  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d @"${UPTIME_CONFIG}")
-
-rm -f "${UPTIME_CONFIG}"
-
-# Check for errors in response
-if echo "${UPTIME_RESPONSE}" | jq -e '.error' > /dev/null 2>&1; then
-    log_error "API Error: $(echo "${UPTIME_RESPONSE}" | jq -r '.error.message')"
-    log_error "Full response: ${UPTIME_RESPONSE}"
-    exit 1
-fi
-
-# Extract the uptime check name/ID using jq
-UPTIME_CHECK_ID=$(echo "${UPTIME_RESPONSE}" | jq -r '.name // empty')
+# Step 2: Create or Get Uptime Check
+log_info "Step 2: Checking for existing Uptime Check for ${DOMAIN}..."
+UPTIME_CHECK_ID=$(gcloud monitoring uptime-checks list \
+  --filter="displayName=\"Uptime check for ${DOMAIN}\"" \
+  --format="value(name)")
 
 if [[ -z "${UPTIME_CHECK_ID}" ]]; then
-    log_error "Failed to create uptime check. Response: ${UPTIME_RESPONSE}"
-    exit 1
+  log_info "No existing uptime check found. Creating new uptime check..."
+  UPTIME_CHECK_FULL_NAME=$(gcloud monitoring uptime-checks create \
+    --display-name="Uptime check for ${DOMAIN}" \
+    --resource-type="uptime_url" \
+    --resource-labels="host=${DOMAIN}" \
+    --http-check-path="/" \
+    --http-check-port=443 \
+    --http-check-use-ssl \
+    --http-check-validate-ssl \
+    --period=300s \
+    --timeout=10s \
+    --format="value(name)")
+    UPTIME_CHECK_ID="$UPTIME_CHECK_FULL_NAME"
+    log_success "Created Uptime Check: ${UPTIME_CHECK_ID}"
+else
+    log_success "Found existing uptime check: ${UPTIME_CHECK_ID}"
 fi
 
-log_success "Created Uptime Check: ${UPTIME_CHECK_ID}"
 
-# Step 3: Create Alert Policy using API
-log_info "Step 3: Creating Alert Policy for Uptime Check..."
+# Step 3: Create or Get Alert Policy
+log_info "Step 3: Checking for existing Alert Policy for ${DOMAIN}..."
+ALERT_POLICY_ID=$(gcloud alpha monitoring policies list \
+  --filter="displayName=\"Uptime Check Alert for ${DOMAIN}\"" \
+  --format="value(name)")
 
-# Extract just the check_id from the full path
-CHECK_ID_ONLY=$(basename "${UPTIME_CHECK_ID}")
+if [[ -z "${ALERT_POLICY_ID}" ]]; then
+  log_info "No existing alert policy found. Creating new alert policy..."
+  CHECK_ID_ONLY=$(basename "${UPTIME_CHECK_ID}")
 
-ALERT_CONFIG=$(mktemp)
-cat > "${ALERT_CONFIG}" << EOF
+  ALERT_CONFIG=$(mktemp)
+  cat > "${ALERT_CONFIG}" << EOF
 {
   "displayName": "Uptime Check Alert for ${DOMAIN}",
   "conditions": [
     {
       "displayName": "Uptime check failed",
       "conditionThreshold": {
-        "filter": "metric.type=\"monitoring.googleapis.com/uptime_check/check_passed\" AND resource.type=\"uptime_url\" AND metric.label.check_id=\"${CHECK_ID_ONLY}\"",
+        "filter": "metric.type=\\"monitoring.googleapis.com/uptime_check/check_passed\\" AND resource.type=\\"uptime_url\\" AND metric.label.check_id=\\"${CHECK_ID_ONLY}\\"",
         "comparison": "COMPARISON_LT",
         "thresholdValue": 1,
         "duration": "300s",
@@ -149,31 +165,15 @@ cat > "${ALERT_CONFIG}" << EOF
 }
 EOF
 
-# Create alert policy via API
-ALERT_RESPONSE=$(curl -s -X POST \
-  "https://monitoring.googleapis.com/v3/projects/${PROJECT_ID}/alertPolicies" \
-  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d @"${ALERT_CONFIG}")
+  ALERT_POLICY_ID=$(gcloud alpha monitoring policies create \
+    --policy-from-file="${ALERT_CONFIG}" \
+    --format="value(name)")
 
-rm -f "${ALERT_CONFIG}"
-
-# Check for errors in response
-if echo "${ALERT_RESPONSE}" | jq -e '.error' > /dev/null 2>&1; then
-    log_error "API Error: $(echo "${ALERT_RESPONSE}" | jq -r '.error.message')"
-    log_error "Full response: ${ALERT_RESPONSE}"
-    exit 1
+  rm -f "${ALERT_CONFIG}"
+  log_success "Created Alert Policy: ${ALERT_POLICY_ID}"
+else
+    log_success "Found existing alert policy: ${ALERT_POLICY_ID}"
 fi
-
-# Extract alert policy name using jq
-ALERT_POLICY_ID=$(echo "${ALERT_RESPONSE}" | jq -r '.name // empty')
-
-if [[ -z "${ALERT_POLICY_ID}" ]]; then
-    log_error "Failed to create alert policy. Response: ${ALERT_RESPONSE}"
-    exit 1
-fi
-
-log_success "Created Alert Policy: ${ALERT_POLICY_ID}"
 
 echo "------------------------------------------------------------"
 log_success "Monitoring Setup Complete!"
