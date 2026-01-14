@@ -32,6 +32,13 @@ create_optimized_nginx_config() {
         log_info "Updated worker_processes in main nginx.conf"
     fi
     
+    # Comment out gzip in main config to avoid duplicates
+    # Debian's default nginx.conf has gzip settings that will conflict
+    if grep -q "^\s*gzip on;" "$main_config"; then
+        sed -i 's/^\s*gzip on;/# gzip on; # Moved to e2-micro-optimizations.conf/' "$main_config"
+        log_info "Commented out default gzip settings in main nginx.conf"
+    fi
+    
     # Create http-level optimizations in conf.d
     backup_file "$http_config" "/etc/nginx/conf.d"
     
