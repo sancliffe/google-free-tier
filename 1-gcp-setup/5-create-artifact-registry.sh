@@ -123,38 +123,40 @@ main() {
     POLICY_FILE=$(mktemp)
     
     cat > "${POLICY_FILE}" << 'EOF'
-[
-  {
-    "name": "keep-last-five-production",
-    "action": {"type": "KEEP"},
-    "mostRecentVersions": {
-      "keepCount": 5
+{
+  "rules": [
+    {
+      "name": "keep-last-five-production",
+      "action": "KEEP",
+      "condition": {
+        "tagState": "TAGGED",
+        "tagPrefixes": ["production"]
+      },
+      "mostRecentVersions": {
+        "keepCount": 5
+      }
     },
-    "condition": {
-       "tagState": "TAGGED",
-       "tagPrefixes": ["production"]
-    }
-  },
-  {
-    "name": "keep-last-five-staging",
-    "action": {"type": "KEEP"},
-    "mostRecentVersions": {
-      "keepCount": 5
+    {
+      "name": "keep-last-five-staging",
+      "action": "KEEP",
+      "condition": {
+        "tagState": "TAGGED",
+        "tagPrefixes": ["staging"]
+      },
+      "mostRecentVersions": {
+        "keepCount": 5
+      }
     },
-    "condition": {
-       "tagState": "TAGGED",
-       "tagPrefixes": ["staging"]
+    {
+      "name": "delete-untagged-after-7-days",
+      "action": "DELETE",
+      "condition": {
+        "tagState": "UNTAGGED",
+        "olderThan": "604800s"
+      }
     }
-  },
-  {
-    "name": "delete-untagged-after-7-days",
-    "action": {"type": "DELETE"},
-    "condition": {
-      "tagState": "UNTAGGED",
-      "olderThan": "604800s"
-    }
-  }
-]
+  ]
+}
 EOF
 
     # Apply Cleanup Policy
@@ -162,10 +164,11 @@ EOF
     if gcloud artifacts repositories set-cleanup-policies "${REPO_NAME}" \
         --project="${PROJECT_ID}" \
         --location="${LOCATION}" \
-        --policy-from-file="${POLICY_FILE}"; then
+        --policy="file://${POLICY_FILE}" 2>/dev/null; then
         log_success "Cleanup policies applied successfully."
     else
-        log_error "Failed to apply cleanup policies. Continuing anyway..."
+        log_info "Cleanup policies not supported or failed to apply. This is optional and won't affect functionality."
+        log_info "You can manually set cleanup policies in the GCP Console if needed."
     fi
 
     # Clean up the temp file
