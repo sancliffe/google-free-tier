@@ -1,4 +1,4 @@
-# ☁️ google-free-tier
+# google-free-tier
 
 **A complete guide to hosting applications on Google Cloud Platform's Free Tier.**
 
@@ -8,13 +8,13 @@ Setup and configure a web server on a Google Cloud Free Tier `e2-micro` VM, or d
 
 
 
-## 🎯 Deployment Options
+## Deployment Options
 
 Choose your preferred deployment path:
 
 | Path | Technologies | Best For | Cost |
 |------|---------------|----------|------|
-| **Manual VM Setup** (Phases 1-2) | Bash, Nginx, DuckDNS, Let's Encrypt | Learning, hobby projects | Free ✅ |
+| **Manual VM Setup** (Phases 1-2) | Bash, Nginx, DuckDNS, Let's Encrypt | Learning, hobby projects | Free |
 | **Serverless Cloud Run** (Phase 3) | Node.js, Docker, Firestore | Scalable web apps | Free* |
 | **Kubernetes (GKE Autopilot)** (Phase 4) | Kubernetes, GKE, Firestore | Production workloads | ~$20-30/mo |
 | **Infrastructure as Code** (Phase 5) | Terraform, Packer, CI/CD | Reproducible infrastructure | Varies |
@@ -23,7 +23,7 @@ Choose your preferred deployment path:
 
 ---
 
-## � Documentation
+## Documentation
 
 This project includes comprehensive documentation:
 
@@ -34,7 +34,7 @@ This project includes comprehensive documentation:
 
 ---
 
-## �📋 Prerequisites
+## Prerequisites
 
 Before starting, ensure you have the following installed on your **local machine**:
 
@@ -48,7 +48,7 @@ Before starting, ensure you have the following installed on your **local machine
 
 ---
 
-## 💰 Cost Considerations
+## Cost Considerations
 
 **Free Tier Resources:**
 - **Compute Engine:** 1 `e2-micro` VM instance (744 hours/month in select regions)
@@ -62,7 +62,7 @@ Before starting, ensure you have the following installed on your **local machine
 - **GKE Autopilot:** While there's no cluster management fee, you pay for the compute resources (vCPU/RAM) your pods use (~$20-30/month for a basic deployment)
 - **Cloud Storage:** Storage beyond 5GB per month
 - **Network Egress:** 
-⚠️ **NETWORK EGRESS WARNING:**
+**NETWORK EGRESS WARNING:**
 - Free tier: 1GB/month from North America only (excluding China/Australia)
 - Premium tier egress is charged
 - **Static external IPs on stopped VMs incur charges (~$3/month)**
@@ -79,7 +79,7 @@ Before starting, ensure you have the following installed on your **local machine
 
 ---
 
-## 🔒 Security & Contributing
+## Security & Contributing
 
 This project is committed to being a welcoming and safe community for all contributors. Before getting started:
 
@@ -91,7 +91,7 @@ This project is committed to being a welcoming and safe community for all contri
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 Ready to get started? Here's the 30-second setup:
 
@@ -100,14 +100,14 @@ Ready to get started? Here's the 30-second setup:
 git clone https://github.com/BranchingBad/google-free-tier.git
 cd google-free-tier
 
-# 2. Make scripts executable
-chmod +x 1-gcp-setup/*.sh 2-host-setup/*.sh 3-cloud-run-deployment/*.sh 3-gke-deployment/*.sh
+# 2. Make setup scripts executable
+chmod +x 1-gcp-setup/setup-gcp.sh 2-host-setup/*.sh 3-cloud-run-deployment/*.sh 3-gke-deployment/*.sh
 
 # 3. Choose your path:
-# - Manual: Start with Phase 1 below ⬇️
+# - Manual: Start with Phase 1 below
 # - Cloud Run: Jump to Phase 3 after Phase 1
 # - Kubernetes: Jump to Phase 4 after Phase 1
-# - Full IaC: Jump to Phase 5 after Phase 1
+- Full IaC: Jump to Phase 5 after Phase 1
 
 ### Before You Begin
 
@@ -136,112 +136,40 @@ This verifies:
 
 ---
 
-## Phase 1: 🏗️ Google Cloud Setup (Manual)
+## Phase 1: Google Cloud Setup (Automated)
 
-Run these commands from your **local machine** to prepare your GCP environment.
+This phase prepares your GCP environment by creating a VM, setting up firewall rules, monitoring, secrets, and an artifact registry. The process is automated with a single script.
 
-### 1. Create the VM Instance 💻
+### 1. Configure Your Setup
 
-⚠️ **CRITICAL:** The free tier e2-micro VM is ONLY available in these regions:
-- us-west1 (Oregon)
-- us-central1 (Iowa) ✅ Used by default
-- us-east1 (South Carolina)
-
-**Important:** The free tier for the e2-micro VM is calculated based on **combined usage across all three regions**. Exceeding free tier limits in any or all of these regions combined will incur charges. Using any other region will also incur charges!
-
-Creates an `e2-micro` instance running Debian 12.
+Before running the script, you need to create a configuration file.
 
 ```bash
-# Set your values
-ZONE="us-central1-a" # Default free tier zone
-
-# See 1-gcp-setup/1-create-vm.txt for the full command
-gcloud compute instances create free-tier-vm \
-  --machine-type=e2-micro \
-  --zone="${ZONE}" \
-  --image-family=debian-12 \
-  --image-project=debian-cloud \
-  --boot-disk-size=30GB \
-  --boot-disk-type=pd-standard \
-  --boot-disk-auto-delete
+cd 1-gcp-setup
+cp config.sh.example config.sh
 ```
 
-**Note:** If you want to use a different zone, update `--zone` parameter and use the same zone throughout this guide.
+Now, edit `config.sh` and fill in the required values for your environment.
 
-**Validation:** Verify the VM is running:
-```bash
-gcloud compute instances list
-```
+### 2. Run the Setup Script
 
-### 2. Open Firewall Ports 🔥
-
-Allows HTTP and HTTPS traffic to the VM.
+Once the configuration is ready, run the automated setup script from the `1-gcp-setup` directory:
 
 ```bash
-# Set your values
-ZONE="us-central1-a" # Default free tier zone
-
-# See 1-gcp-setup/2-open-firewall.txt
-gcloud compute instances add-tags free-tier-vm \
-  --tags=http-server,https-server \
-  --zone="${ZONE}"
+bash ./setup-gcp.sh
 ```
+This script will:
+- Create the `e2-micro` VM instance.
+- Open firewall ports for HTTP and HTTPS traffic.
+- Set up monitoring and alerting for your VM.
+- Create secrets in Google Secret Manager.
+- Create a Docker repository in Artifact Registry.
 
-**Validation:** Check that firewall rules are applied:
-```bash
-gcloud compute firewall-rules list --filter="targetTags:http-server"
-```
-
-### 3. Setup Monitoring and Alerting 📊
-
-Sets up an uptime check and email alerts if your site goes down.
-
-```bash
-bash ./1-gcp-setup/3-setup-monitoring.sh
-```
-
-This script will prompt you for:
-- Email address for alerts
-- Display name for notification channel
-- Domain name to monitor
-
-### 4. Create Secrets 🤫
-
-Interactively creates secrets (DuckDNS token, Email, etc.) in Google Secret Manager.
-
-```bash
-bash ./1-gcp-setup/4-create-secrets.sh
-```
-
-**Secrets created:**
-- `duckdns_token` - Your DuckDNS token
-- `email_address` - Email for SSL renewal notices
-- `domain_name` - Your domain (e.g., my.duckdns.org)
-- `gcs_bucket_name` - GCS bucket name for backups
-- `tf_state_bucket` - Terraform state bucket name
-- `backup_dir` - Directory to back up (e.g., /var/www/html)
-- `billing_account_id` - Your billing account ID
-
-**Note:** These secrets are used by Terraform and Cloud Build configurations.
-
-### 5. Create Artifact Registry 🐳
-
-Creates the Docker repository required for Cloud Run and GKE deployments.
-
-```bash
-bash ./1-gcp-setup/5-create-artifact-registry.sh
-```
-
-This creates a Docker repository named `gke-apps` in Artifact Registry where your container images will be stored.
-
-**Validation:**
-```bash
-gcloud artifacts repositories list --location=us-central1
-```
+The script is idempotent, meaning you can safely run it multiple times. After running the script, you can proceed to Phase 2.
 
 
 
-## Phase 2: ⚙️ Host VM Setup (Manual)
+## Phase 2: Host VM Setup (Manual)
 
 SSH into your VM and run these scripts from the `2-host-setup/` directory.
 
@@ -260,7 +188,7 @@ chmod +x 2-host-setup/*.sh
 
 The scripts in `2-host-setup/` are numbered for clarity. Run them in order. They are idempotent (can be safely re-run).
 
-### 1. Create Swap File 💾
+### 1. Create Swap File 
 
 Creates a 2GB swap file to support the 1GB RAM limit of the e2-micro.
 
@@ -274,7 +202,7 @@ free -h
 swapon --show
 ```
 
-### 2. Install Nginx 🌐
+### 2. Install Nginx 
 
 Installs and enables the web server.
 
@@ -287,7 +215,7 @@ sudo bash ./2-host-setup/2-install-nginx.sh
 curl http://$(curl -s ifconfig.me)
 ```
 
-### 3. Setup DuckDNS 🦆
+### 3. Setup DuckDNS 
 
 Configures a cron job to keep your dynamic DNS updated.
 
@@ -305,7 +233,7 @@ bash ./2-host-setup/3-setup-duckdns.sh "your-subdomain" "your-duckdns-token"
 crontab -l | grep duckdns
 ```
 
-### 4. Setup SSL 🔒
+### 4. Setup SSL 
 
 Installs Let's Encrypt SSL certificates using Certbot.
 
@@ -325,7 +253,7 @@ sudo bash ./2-host-setup/4-setup-ssl.sh "your-domain.duckdns.org" "your-email@ex
 curl https://your-domain.duckdns.org
 ```
 
-### 5. Adjust Local Firewall 🛡️
+### 5. Adjust Local Firewall 
 
 Configures `ufw` to allow Nginx traffic (if active).
 
@@ -335,7 +263,7 @@ sudo bash ./2-host-setup/5-adjust-firewall.sh
 
 This script automatically checks if `ufw` is active before making changes.
 
-### 6. Setup Automated Backups 📦
+### 6. Setup Automated Backups 
 
 Configures a daily cron job to back up your site to Google Cloud Storage.
 
@@ -387,7 +315,7 @@ rm /tmp/backup-YYYY-MM-DD-HHMMSS.tar.gz
 rm -r /tmp/restore-test/
 ```
 
-### 7. Harden Security 🛡️
+### 7. Harden Security 
 
 Installs Fail2Ban and configures unattended security updates.
 
@@ -400,7 +328,7 @@ sudo bash ./2-host-setup/7-setup-security.sh
 sudo fail2ban-client status
 ```
 
-### 8. Install Ops Agent 📈
+### 8. Install Ops Agent 
 
 Installs the Google Cloud Ops Agent to monitor Memory and Swap usage (metrics not available by default).
 
@@ -417,7 +345,7 @@ sudo systemctl status google-cloud-ops-agent
 
 ---
 
-## Phase 3: 🚀 Cloud Run Deployment (Serverless)
+## Phase 3: Cloud Run Deployment (Serverless)
 
 Deploy a Node.js application to Google Cloud Run (Free Tier eligible). The updated app now connects to Firestore to persist a visitor count.
 
@@ -476,9 +404,9 @@ Visit the URL in your browser to see your application running and the visitor co
 
 ---
 
-## Phase 4: ☸️ GKE Autopilot Deployment (Kubernetes)
+## Phase 4: GKE Autopilot Deployment (Kubernetes)
 
-## ⚠️ **CRITICAL COST WARNING FOR GKE**
+## **CRITICAL COST WARNING FOR GKE**
 
 **GKE Autopilot is NOT FREE**. You will incur charges of approximately **$20-30/month** even with a single pod using minimal resources.
 
@@ -549,7 +477,7 @@ terraform destroy
 
 ---
 
-## Phase 5: 🤖 Terraform (Infrastructure as Code)
+## Phase 5: Terraform (Infrastructure as Code)
 
 The terraform/ directory automates the creation of all infrastructure including VM, GKE cluster, Cloud Run services, monitoring, and "Cost Killer" logic. It also handles the enabling of Firestore APIs and IAM permissions required for the new application features.
 
@@ -648,7 +576,7 @@ gcloud container clusters list
 terraform output
 ```
 
-### 💸 Cost Killer Function
+### Cost Killer Function
 
 The Terraform configuration includes a "Cost Killer" Cloud Function (`terraform/budget.tf`).
 
@@ -688,7 +616,7 @@ cd terraform
 terraform destroy
 ```
 
-⚠️ **Warning:** This will delete all resources including VMs, clusters, and may cause data loss. Ensure you have backups.
+**Warning:** This will delete all resources including VMs, clusters, and may cause data loss. Ensure you have backups.
 
 To destroy only the state bucket:
 ```bash
@@ -698,7 +626,7 @@ terraform destroy
 
 ---
 
-## 🧹 Cleanup / Teardown
+## Cleanup / Teardown
 
 ### Manual Setup Cleanup (Phases 1-2)
 
@@ -802,7 +730,7 @@ terraform destroy
 
 ---
 
-## 🔧 Advanced: Packer & CI/CD
+## Advanced: Packer & CI/CD
 
 ### Packer
 
@@ -908,7 +836,7 @@ Note: If you use `core.hooksPath`, ensure the scripts inside `.git-hooks` are ex
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Quick Reference
 
@@ -1049,10 +977,10 @@ Note: If you use `core.hooksPath`, ensure the scripts inside `.git-hooks` are ex
 
 ---
 
-## 🔒 Security Best Practices
+## Security Best Practices
 
 1. **Never commit secrets to Git**
-   - Add `terraform.tfvars`, `*.env`, and `*.key` to `.gitignore` ✅ (already done)
+   - Add `terraform.tfvars`, `*.env`, and `*.key` to `.gitignore` (already done)
    - Use Secret Manager for all sensitive data
    - Rotate credentials regularly
 
@@ -1105,7 +1033,7 @@ Note: If you use `core.hooksPath`, ensure the scripts inside `.git-hooks` are ex
 
 ---
 
-## 📝 Contributing
+## Contributing
 
 We welcome contributions! Whether you're fixing bugs, improving documentation, adding features, or helping other users, your help is appreciated.
 
@@ -1129,7 +1057,7 @@ We welcome contributions! Whether you're fixing bugs, improving documentation, a
 
 ---
 
-## � Getting Help
+## Getting Help
 
 ### Documentation
 - **Setup Help:** Review the appropriate phase section below
@@ -1146,7 +1074,7 @@ Check the [Troubleshooting](#-troubleshooting) section below for solutions to co
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - **Google Cloud Platform** - For the generous free tier
 - **Let's Encrypt** - For free SSL certificates
@@ -1156,26 +1084,26 @@ Check the [Troubleshooting](#-troubleshooting) section below for solutions to co
 
 ---
 
-## � License
+## License
 
 This project is open source and available under the [MIT License](LICENSE).
 
 ---
 
-## 📌 Project Status
+## Project Status
 
 | Component | Status | Version |
 |-----------|--------|---------|
-| Manual VM Setup | ✅ Stable | 2.0.0 |
-| Cloud Run | ✅ Stable | 2.0.0 |
-| GKE Autopilot | ✅ Stable | 2.0.0 |
-| Terraform | ✅ Stable | 2.0.0 |
-| Bash Utilities | ✅ Stable | 2.0.0 |
-| Documentation | ✅ Complete | 2.0.0 |
+| Manual VM Setup | Stable | 2.0.0 |
+| Cloud Run | Stable | 2.0.0 |
+| GKE Autopilot | Stable | 2.0.0 |
+| Terraform | Stable | 2.0.0 |
+| Bash Utilities | Stable | 2.0.0 |
+| Documentation | Complete | 2.0.0 |
 
 ---
 
-## 📚 Additional Resources
+## Additional Resources
 
 ### Official Documentation
 - [Google Cloud Free Tier](https://cloud.google.com/free)
@@ -1204,7 +1132,7 @@ This project is open source and available under the [MIT License](LICENSE).
 
 ---
 
-## 🖼️ Architecture Diagram (Suggested)
+## Architecture Diagram (Suggested)
 
 This project would benefit from a visual architecture diagram, illustrating the relationships between:
 - The VM with Nginx
@@ -1215,6 +1143,6 @@ This project would benefit from a visual architecture diagram, illustrating the 
 
 ---
 
-## 📄 License
+## License
 
 This project is open source and available under the [MIT License](LICENSE).

@@ -127,7 +127,9 @@ main() {
   "rules": [
     {
       "name": "keep-last-five-production",
-      "action": "KEEP",
+      "action": {
+        "type": "KEEP"
+      },
       "condition": {
         "tagState": "TAGGED",
         "tagPrefixes": ["production"]
@@ -138,7 +140,9 @@ main() {
     },
     {
       "name": "keep-last-five-staging",
-      "action": "KEEP",
+      "action": {
+        "type": "KEEP"
+      },
       "condition": {
         "tagState": "TAGGED",
         "tagPrefixes": ["staging"]
@@ -149,7 +153,9 @@ main() {
     },
     {
       "name": "delete-untagged-after-7-days",
-      "action": "DELETE",
+      "action": {
+        "type": "DELETE"
+      },
       "condition": {
         "tagState": "UNTAGGED",
         "olderThan": "604800s"
@@ -164,7 +170,7 @@ EOF
     if gcloud artifacts repositories set-cleanup-policies "${REPO_NAME}" \
         --project="${PROJECT_ID}" \
         --location="${LOCATION}" \
-        --policy="file://${POLICY_FILE}" 2>/dev/null; then
+        --policy="${POLICY_FILE}"; then
         log_success "Cleanup policies applied successfully."
     else
         log_info "Cleanup policies not supported or failed to apply. This is optional and won't affect functionality."
