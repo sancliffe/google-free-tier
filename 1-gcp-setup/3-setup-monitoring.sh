@@ -100,13 +100,15 @@ fi
 
 # Step 2: Create or Get Uptime Check
 log_info "Step 2: Checking for existing Uptime Check for ${DOMAIN}..."
-UPTIME_CHECK_ID=$(gcloud monitoring uptime-checks list \
-  --filter="displayName=\"Uptime check for ${DOMAIN}\"" \
-  --format="value(name)")
+UPTIME_CHECK_ID=$(gcloud monitoring uptime list-configs \
+  --project="${PROJECT_ID}" \
+  --format='value(name,displayName)' | \
+  grep "Uptime check for ${DOMAIN}" | \
+  awk '{print $1}' || true)
 
 if [[ -z "${UPTIME_CHECK_ID}" ]]; then
   log_info "No existing uptime check found. Creating new uptime check..."
-  UPTIME_CHECK_FULL_NAME=$(gcloud monitoring uptime-checks create \
+  UPTIME_CHECK_FULL_NAME=$(gcloud monitoring uptime create \
     --display-name="Uptime check for ${DOMAIN}" \
     --resource-type="uptime_url" \
     --resource-labels="host=${DOMAIN}" \
