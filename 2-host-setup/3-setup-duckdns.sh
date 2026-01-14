@@ -13,6 +13,9 @@ INSTALL_DIR="${HOME}/.duckdns"
 SCRIPT_FILE="${INSTALL_DIR}/update.sh"
 LOG_FILE="${INSTALL_DIR}/duck.log"
 
+# Ensure the installation directory exists before any logging occurs
+mkdir -p "${INSTALL_DIR}"
+
 # --- Main Logic ---
 main() {
     log_info "--- Phase 3: Setting up DuckDNS ---"
