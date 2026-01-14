@@ -16,7 +16,11 @@ REGION="${REGION:-us-central1}"
 
 # --- Main Logic ---
 main() {
-    log_info "--- Phase 6: Setting up Automated Backups ---"
+    echo ""
+    echo "$(printf '=%.0s' {1..60})"
+    log_info "Phase 6: Setting up Automated Backups"
+    echo "$(printf '=%.0s' {1..60})"
+    echo ""
     ensure_root || exit 1
 
     local BUCKET_NAME="${1:-}"

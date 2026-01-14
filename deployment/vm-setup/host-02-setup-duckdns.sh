@@ -18,7 +18,11 @@ mkdir -p "${INSTALL_DIR}"
 
 # --- Main Logic ---
 main() {
-    log_info "--- Phase 3: Setting up DuckDNS ---"
+    echo ""
+    echo "$(printf '=%.0s' {1..60})"
+    log_info "Phase 3: Setting up DuckDNS"
+    echo "$(printf '=%.0s' {1..60})"
+    echo ""
 
     # Fetch secrets from GCP Secret Manager
     log_info "Fetching DuckDNS credentials from Secret Manager..."
@@ -94,7 +98,7 @@ EOF
         log_error "DuckDNS initial update failed. Please check your settings and the log for details: ${LOG_FILE}"
     fi
 
-    log_info "-------------------------------------"
+    echo ""
 }
 
 main "$@"

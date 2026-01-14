@@ -12,7 +12,11 @@ source "${SCRIPT_DIR}/common.sh"
 set_strict_mode
 
 main() {
-    log_info "--- Phase 5: Adjusting Local Firewall (UFW) ---"
+    echo ""
+    echo "$(printf '=%.0s' {1..60})"
+    log_info "Phase 5: Adjusting Local Firewall (UFW)"
+    echo "$(printf '=%.0s' {1..60})"
+    echo ""
     ensure_root || exit 1
 
     # Check if ufw is installed
@@ -20,7 +24,7 @@ main() {
     # `command -v` is a reliable way to check if a command exists.
     if ! command -v ufw &> /dev/null; then
         log_warn "UFW is not installed. Skipping firewall adjustment."
-        log_info "-------------------------------------------------"
+        echo ""
         exit 0
     fi
 
@@ -28,7 +32,7 @@ main() {
     if ! ufw status | grep -q "Status: active"; then
         log_warn "UFW is not active. Skipping firewall adjustment."
         log_info "You can enable it with: sudo ufw enable"
-        log_info "-------------------------------------------------"
+        echo ""
         exit 0
     fi
 
@@ -38,7 +42,7 @@ main() {
     ufw allow 'Nginx Full'
 
     log_success "Firewall rule for Nginx applied."
-    log_info "-------------------------------------------------"
+    echo ""
 }
 
 main "${1:-}"

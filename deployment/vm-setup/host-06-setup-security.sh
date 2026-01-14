@@ -10,7 +10,11 @@ set_strict_mode
 
 # --- Main Logic ---
 main() {
-    log_info "--- Phase 7: Hardening Server Security ---"
+    echo ""
+    echo "$(printf '=%.0s' {1..60})"
+    log_info "Phase 7: Hardening Server Security"
+    echo "$(printf '=%.0s' {1..60})"
+    echo ""
     ensure_root || exit 1
 
     # --- 1. Fail2Ban ---
@@ -146,7 +150,7 @@ EOF
         fi
     fi
 
-    log_info "----------------------------------------------------"
+    echo ""
 }
 
 main "$@"

@@ -4,7 +4,7 @@
 source "$(dirname "$0")/common.sh"
 set_strict_mode
 
-BACKUP_BUCKET="$1"
+BACKUP_BUCKET="${1:-}"
 CONFIG_FILE="/etc/default/backup-config"
 
 if [[ -z "${BACKUP_BUCKET}" ]]; then

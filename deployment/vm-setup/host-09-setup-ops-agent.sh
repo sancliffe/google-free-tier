@@ -9,7 +9,11 @@ source "${SCRIPT_DIR}/common.sh"
 set_strict_mode
 
 main() {
-    log_info "--- Phase 8: Installing Google Cloud Ops Agent ---"
+    echo ""
+    echo "$(printf '=%.0s' {1..60})"
+    log_info "Phase 8: Installing Google Cloud Ops Agent"
+    echo "$(printf '=%.0s' {1..60})"
+    echo ""
     ensure_root || exit 1
 
     if command -v google-cloud-ops-agent &> /dev/null; then

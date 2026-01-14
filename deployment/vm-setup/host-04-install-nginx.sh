@@ -95,7 +95,11 @@ EOF
 
 # --- Main Logic ---
 main() {
-    log_info "--- Phase 2: Installing Nginx ---"
+    echo ""
+    echo "$(printf '=%.0s' {1..60})"
+    log_info "Phase 2: Installing Nginx"
+    echo "$(printf '=%.0s' {1..60})"
+    echo ""
     
     ensure_root || exit 1
     
@@ -186,7 +190,7 @@ main() {
     
     log_success "Nginx is running and configured to start on boot."
 
-    log_info "-----------------------------------"
+    echo ""
 }
 
 # --- Script Execution ---

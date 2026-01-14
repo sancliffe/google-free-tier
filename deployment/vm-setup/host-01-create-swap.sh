@@ -20,7 +20,11 @@ SWAP_SIZE="2G" # 2 Gigabytes
 SWAPPINESS_VALUE="10" # 10 is a good value for servers
 
 main() {
-    log_info "--- Phase 1: Configuring Swap File ---"
+    echo ""
+    echo "$(printf '=%.0s' {1..60})"
+    log_info "Phase 1: Configuring Swap File"
+    echo "$(printf '=%.0s' {1..60})"
+    echo ""
     ensure_root || exit 1
 
     # Check disk space before creating swap
@@ -42,7 +46,7 @@ main() {
                  exit 1
              }
         fi
-        log_info "----------------------------------------"
+        echo ""
         exit 0
     fi
 
@@ -97,7 +101,7 @@ main() {
     log_success "Swap file configured successfully."
     log_info "Verifying swap status..."
     free -h || log_warn "Could not run free -h"
-    log_info "----------------------------------------"
+    echo ""
 }
 
 main "${1:-}"

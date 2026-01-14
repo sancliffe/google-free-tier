@@ -65,26 +65,35 @@ check_dns() {
 
 # --- Main Logic ---
 main() {
-    log_info "--- Phase 4: Setting up SSL with Let's Encrypt ---"
+    echo ""
+    echo "$(printf '=%.0s' {1..60})"
+    log_info "Phase 4: Setting up SSL with Let's Encrypt"
+    echo "$(printf '=%.0s' {1..60})"
+    echo ""
     ensure_root || exit 1
 
-    # Initialize variables to avoid unbound variable errors
-    local DOMAIN="${1:-}"
-    local EMAIL="${2:-}"
+    # Initialize variables: prioritize command-line args, then env vars, then /run/secrets
+    local DOMAIN="${1:-${DOMAIN:-}}"
+    local EMAIL="${2:-${EMAIL_ADDRESS:-}}"
 
     if [[ -z "${DOMAIN}" || -z "${EMAIL}" ]]; then
-        log_info "Domain or email not provided as arguments. Trying to read from /run/secrets..."
+        log_info "Domain or email not provided as arguments or environment variables. Trying to read from /run/secrets..."
         if [[ -f "/run/secrets/domain_name" && -f "/run/secrets/email_address" ]]; then
             DOMAIN="${DOMAIN:-$(cat /run/secrets/domain_name)}"
             EMAIL="${EMAIL:-$(cat /run/secrets/email_address)}"
             log_info "Using credentials from /run/secrets."
         else
-            log_error "Required secrets not found as arguments or in /run/secrets."
+            log_error "Required secrets not found as arguments, environment variables, or in /run/secrets."
             log_info "Usage: $0 [domain] [email]"
+            log_info "Or set DOMAIN and EMAIL_ADDRESS environment variables (from config.sh)"
             exit 1
         fi
     else
-        log_info "Using credentials provided as arguments."
+        if [[ -n "${1:-}" || -n "${2:-}" ]]; then
+            log_info "Using credentials provided as command-line arguments."
+        else
+            log_info "Using credentials from environment variables."
+        fi
     fi
 
     if [[ -z "${DOMAIN}" || -z "${EMAIL}" ]]; then
@@ -151,7 +160,8 @@ EOF
         # Backup default config before modification
         local backup_dir
         backup_dir=$(mktemp -d)
-        trap 'rm -rf "${backup_dir}"' EXIT
+        # shellcheck disable=SC2064
+        trap "rm -rf '${backup_dir}'" EXIT
         backup_file "/etc/nginx/sites-available/default" "${backup_dir}"
         
         # Added stub_status for Google Cloud Ops Agent metrics
@@ -247,7 +257,7 @@ EOF
       fi
     done
     
-    log_info "----------------------------------------------------"
+    echo ""
 }
 
 main "$@"
