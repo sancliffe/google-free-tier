@@ -47,13 +47,29 @@ COL_RESET="\033[0m"
 
 
 log_info()    { echo -e "${COL_INFO}[INFO]${COL_RESET} 
+
+
 "; }
+
+
 
 log_success() { echo -e "${COL_SUCCESS}[SUCCESS]${COL_RESET} 
+
+
 "; }
 
+
+
 log_error()   { echo -e "${COL_ERROR}[ERROR]${COL_RESET} 
+
+
 "; }
+
+
+
+
+
+
 
 
 
@@ -61,11 +77,21 @@ log_error()   { echo -e "${COL_ERROR}[ERROR]${COL_RESET}
 
 # --- Usage ---
 
+
+
 show_usage() {
+
+
 
     cat << EOF
 
+
+
 Usage: $0 [OPTIONS]
+
+
+
+
 
 
 
@@ -73,75 +99,151 @@ Creates or updates a Docker repository in Google Artifact Registry.
 
 
 
+
+
+
+
 OPTIONS:
+
+
 
     -r, --repo NAME        The name of the repository (default: ${REPO_NAME})
 
+
+
     -l, --location REGION  The GCP region for the repository (default: ${LOCATION})
+
+
 
     --project-id ID        GCP project ID (or use config.sh)
 
+
+
     -h, --help             Show this help message
 
+
+
 EOF
+
+
 
 }
 
 
 
+
+
+
+
 # --- Main Logic ---
+
+
 
 main() {
 
+
+
     while [[ $# -gt 0 ]]; do
 
+
+
         case 
+
+
  in
+
+
 
             -r|--repo)
 
+
+
                 REPO_NAME="$2"
+
+
 
                 shift 2
 
+
+
                 ;;
+
+
 
             -l|--location)
 
+
+
                 LOCATION="$2"
+
+
 
                 shift 2
 
+
+
                 ;;
+
+
 
             --project-id)
 
+
+
                 PROJECT_ID="$2"
+
+
 
                 shift 2
 
+
+
                 ;;
+
+
 
             -h|--help)
 
+
+
                 show_usage
+
+
 
                 exit 0
 
+
+
                 ;;
+
+
 
             *)
 
+
+
                 log_error "Unknown option: 
+
+
 "
+
+
 
                 show_usage
 
+
+
                 exit 1
+
+
 
                 ;;
 
+
+
         esac
+
+
 
     done
 
