@@ -60,7 +60,7 @@ EOF
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
-    case  in
+    case $1 in
         -t|--duckdns-token)    DUCKDNS_TOKEN="$2"; shift 2;;
         -e|--email)            EMAIL_ADDRESS="$2"; shift 2;;
         -d|--domain)           DOMAIN_NAME="$2"; shift 2;;
@@ -71,7 +71,7 @@ while [[ $# -gt 0 ]]; do
         --project-id)          PROJECT_ID="$2"; shift 2;;
         -i|--interactive)      INTERACTIVE_MODE=true; shift;;
         -h|--help)             show_usage; exit 0;;
-        *)                     log_error "Unknown option: "; show_usage; exit 1;;
+        *)                     log_error "Unknown option: $1"; show_usage; exit 1;;
     esac
 done
 
@@ -92,7 +92,7 @@ echo "============================================================"
 
 # Function to create or update a secret
 create_secret() {
-    local secret_name=""
+    local secret_name="$1"
     local secret_value="$2"
 
     if [[ -z "${secret_value}" ]]; then
