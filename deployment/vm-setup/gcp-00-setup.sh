@@ -42,12 +42,12 @@ load_and_prompt_config() {
 
     if [[ -f "${config_file}" ]]; then
         log "Sourcing configuration from ${config_file}..."
-        # shellcheck disable=SC1091
+        # shellcheck source=/dev/null
         source "${config_file}"
     else
         log "WARNING: Configuration file config.sh not found."
         log "Using default values from config.sh.example and prompting for input."
-        # shellcheck disable=SC1091
+        # shellcheck source=/dev/null
         source "${config_example_file}"
     fi
 

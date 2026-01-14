@@ -1,6 +1,7 @@
 #!/bin/bash
 # 2-host-setup/test-backup-restore.sh
 # shellcheck disable=SC1091
+# shellcheck source=/dev/null
 source "$(dirname "$0")/common.sh"
 set_strict_mode
 
@@ -10,6 +11,7 @@ CONFIG_FILE="/etc/default/backup-config"
 if [[ -z "${BACKUP_BUCKET}" ]]; then
     log_info "Bucket name not provided as an argument. Trying config file..."
     if [[ -f "${CONFIG_FILE}" ]]; then
+        # shellcheck source=/dev/null
         source "${CONFIG_FILE}"
         log_info "Loaded bucket name from ${CONFIG_FILE}."
     elif [[ -f "/run/secrets/gcs_bucket_name" ]]; then

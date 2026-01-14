@@ -3,6 +3,7 @@
 # Configures automated backups of critical data to Google Cloud Storage.
 
 set -e
+# shellcheck source=/dev/null
 source "$(dirname "$0")/common.sh"
 
 echo ""

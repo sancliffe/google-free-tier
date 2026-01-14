@@ -4,16 +4,16 @@
 
 # Resolve the directory where the script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=./common.sh
+# shellcheck source=/dev/null
 source "${SCRIPT_DIR}/common.sh"
 set_strict_mode
 
 # --- Main Logic ---
 main() {
     echo ""
-    echo "$(printf '=%.0s' {1..60})"
+    printf '=%.0s' {1..60}; echo
     log_info "Phase 7: Hardening Server Security"
-    echo "$(printf '=%.0s' {1..60})"
+    printf '=%.0s' {1..60}; echo
     echo ""
     ensure_root || exit 1
 

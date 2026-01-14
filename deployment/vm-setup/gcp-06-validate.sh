@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="${SCRIPT_DIR}/config.sh"
 
-# shellcheck source=./common.sh
+# shellcheck source=/dev/null
 if [[ -f "${SCRIPT_DIR}/common.sh" ]]; then
     source "${SCRIPT_DIR}/common.sh"
 else
@@ -14,6 +14,7 @@ else
 fi
 
 if [[ -f "${CONFIG_FILE}" ]]; then
+    # shellcheck source=/dev/null
     source "${CONFIG_FILE}"
 fi
 
