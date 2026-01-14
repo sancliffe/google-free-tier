@@ -56,14 +56,15 @@ main() {
     log_info "--- Phase 4: Setting up SSL with Let's Encrypt ---"
     ensure_root || exit 1
 
+    # Initialize variables to avoid unbound variable errors
     local DOMAIN="${1:-}"
     local EMAIL="${2:-}"
 
     if [[ -z "${DOMAIN}" || -z "${EMAIL}" ]]; then
         log_info "Domain or email not provided as arguments. Trying to read from /run/secrets..."
         if [[ -f "/run/secrets/domain_name" && -f "/run/secrets/email_address" ]]; then
-            DOMAIN=${DOMAIN:-$(cat /run/secrets/domain_name)}
-            EMAIL=${EMAIL:-$(cat /run/secrets/email_address)}
+            DOMAIN="${DOMAIN:-$(cat /run/secrets/domain_name)}"
+            EMAIL="${EMAIL:-$(cat /run/secrets/email_address)}"
             log_info "Using credentials from /run/secrets."
         else
             log_error "Required secrets not found as arguments or in /run/secrets."
