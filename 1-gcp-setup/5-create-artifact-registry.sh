@@ -159,15 +159,17 @@ EOF
 
     # Apply Cleanup Policy
     log_info "Applying cleanup policies..."
-    gcloud artifacts repositories set-cleanup-policies "${REPO_NAME}" \
+    if gcloud artifacts repositories set-cleanup-policies "${REPO_NAME}" \
         --project="${PROJECT_ID}" \
         --location="${LOCATION}" \
-        --policy="$(cat "${POLICY_FILE}")"
+        --policy-from-file="${POLICY_FILE}"; then
+        log_success "Cleanup policies applied successfully."
+    else
+        log_error "Failed to apply cleanup policies. Continuing anyway..."
+    fi
 
     # Clean up the temp file
     rm -f "${POLICY_FILE}"
-
-    log_success "Cleanup policies applied successfully."
 
     # Configure Docker Authentication
     log_info "Configuring Docker authentication for ${LOCATION}-docker.pkg.dev..."
