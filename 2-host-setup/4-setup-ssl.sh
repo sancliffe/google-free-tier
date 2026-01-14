@@ -56,8 +56,8 @@ main() {
     log_info "--- Phase 4: Setting up SSL with Let's Encrypt ---"
     ensure_root || exit 1
 
-    local DOMAIN="$1"
-    local EMAIL="$2"
+    local DOMAIN="${1:-}"
+    local EMAIL="${2:-}"
 
     if [[ -z "${DOMAIN}" || -z "${EMAIL}" ]]; then
         log_info "Domain or email not provided as arguments. Trying to read from /run/secrets..."
