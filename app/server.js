@@ -17,6 +17,16 @@ const firestore = new Firestore({
   },
 });
 
+// Validate Firestore connection on startup
+firestore.collection('_health').limit(1).get()
+  .then(() => {
+    console.log('✓ Firestore connection established successfully');
+  })
+  .catch(err => {
+    console.error('✗ FATAL: Cannot connect to Firestore on startup:', err.message);
+    process.exit(1);
+  });
+
 // Add comprehensive health check
 let lastHealthCheck = { timestamp: 0, result: null };
 const HEALTH_CHECK_CACHE_MS = 5000; // 5 seconds

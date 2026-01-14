@@ -54,21 +54,25 @@ resource "google_storage_bucket" "tfstate" {
     }
   }
 
-  encryption {
-    default_kms_key_name = google_kms_crypto_key.terraform_state_bucket.id
-  }
+  # NOTE: KMS encryption is commented out initially to avoid dependency issues
+  # After the bucket is created, you can uncomment this and apply again
+  # encryption {
+  #   default_kms_key_name = google_kms_crypto_key.terraform_state_bucket.id
+  # }
 
-  logging {
-    destination = google_storage_bucket.tfstate_logs.name
-  }
+  # NOTE: Logging is also commented out initially - uncomment after tfstate_logs bucket exists
+  # logging {
+  #   destination = google_storage_bucket.tfstate_logs.name
+  # }
 
   lifecycle {
     prevent_destroy = true
   }
 
-  depends_on = [
-    google_kms_crypto_key.terraform_state_bucket
-  ]
+  # NOTE: Removed depends_on to allow bucket creation first
+  # depends_on = [
+  #   google_kms_crypto_key.terraform_state_bucket
+  # ]
 }
 
 resource "google_storage_bucket" "tfstate_logs" {

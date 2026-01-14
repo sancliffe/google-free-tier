@@ -20,10 +20,12 @@ steps:
 - name: 'koalaman/shellcheck-alpine'
   args: 
     - '-x'
-    - '1-gcp-setup/*.sh'
-    - '2-host-setup/*.sh'
-    - '3-cloud-run-deployment/*.sh'
-    - '3-gke-deployment/*.sh'
+    - 'deployment/vm-setup/*.sh'
+    - 'deployment/cloud-run/*.sh'
+    - 'deployment/gke/*.sh'
+    - 'scripts/validation/*.sh'
+    - 'scripts/setup/*.sh'
+    - 'scripts/maintenance/*.sh'
 
 # 2. Terraform Code Quality Checks
 - name: 'hashicorp/terraform:1.8.4'

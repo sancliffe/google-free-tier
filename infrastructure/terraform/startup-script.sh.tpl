@@ -86,6 +86,14 @@ if [ ! -f "$SECRETS_MARKER" ]; then
             echo "ERROR: Failed to fetch item '$name'"
             return 1
         fi
+        
+        # Verify secret is not empty
+        if [ ! -s "$file_path" ]; then
+            echo "ERROR: Secret '$name' is empty"
+            rm -f "$file_path"
+            return 1
+        fi
+        
         chmod 600 "$file_path"
         echo "Successfully fetched item: $name"
     }

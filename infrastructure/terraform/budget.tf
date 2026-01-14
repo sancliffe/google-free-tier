@@ -111,26 +111,42 @@ resource "google_project_iam_member" "cost_killer_sa_datastore" {
   depends_on = [google_app_engine_application.app[0]]
 }
 
-# This null_resource is a more robust way to handle IAM propagation delays.
-# It uses a local-exec provisioner to poll the IAM policy until the new
-# member is present, with a timeout. This is more reliable than a fixed sleep.
+# This null_resource is a robust way to handle IAM propagation delays.
+# It uses exponential backoff to poll the IAM policy until the new
+# member is present, with a maximum timeout. This is more reliable than fixed sleep intervals.
 resource "null_resource" "verify_iam" {
   count      = var.enable_vm ? 1 : 0
   depends_on = [google_project_iam_member.cost_killer_sa_compute, google_project_iam_member.cost_killer_sa_datastore]
 
   provisioner "local-exec" {
     command = <<EOF
-for i in {1..60}; do  # Increased from 30
+RETRY_DELAY=2
+MAX_ATTEMPTS=30
+ATTEMPT=0
+
+while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+  ATTEMPT=$((ATTEMPT + 1))
+  
   if gcloud projects get-iam-policy ${var.project_id} \
      --flatten="bindings[].members" \
      --filter="bindings.role:projects/${var.project_id}/roles/vmStopper AND bindings.members:serviceAccount:${var.project_id}@appspot.gserviceaccount.com" \
-     --format="value(bindings.members)" | grep -q "${var.project_id}@appspot.gserviceaccount.com"; then
-    echo "IAM policy verified"
+     --format="value(bindings.members)" 2>/dev/null | grep -q "${var.project_id}@appspot.gserviceaccount.com"; then
+    echo "✓ IAM policy verified on attempt $ATTEMPT"
     exit 0
   fi
-  sleep 3
+  
+  if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+    echo "IAM not yet propagated. Attempt $ATTEMPT/$MAX_ATTEMPTS. Waiting ${RETRY_DELAY}s..."
+    sleep $RETRY_DELAY
+    RETRY_DELAY=$((RETRY_DELAY * 2))
+    # Cap exponential backoff at 60 seconds
+    if [ $RETRY_DELAY -gt 60 ]; then
+      RETRY_DELAY=60
+    fi
+  fi
 done
-echo "Timed out waiting for IAM propagation for cost-killer."
+
+echo "✗ Timed out waiting for IAM propagation after $MAX_ATTEMPTS attempts (max wait: ~${RETRY_DELAY}s)"
 exit 1
 EOF
   }
