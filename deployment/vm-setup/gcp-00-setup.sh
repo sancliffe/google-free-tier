@@ -236,4 +236,3 @@ DURATION=$((END_TIME - START_TIME))
 echo ""
 log "⏱️  Total setup time: $((DURATION / 60))m $((DURATION % 60))s"
 echo ""
-}
