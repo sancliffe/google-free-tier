@@ -112,10 +112,7 @@ if [[ -z "${UPTIME_CHECK_ID}" ]]; then
     --display-name="Uptime check for ${DOMAIN}" \
     --resource-type="uptime_url" \
     --resource-labels="host=${DOMAIN}" \
-    --http-check-path="/" \
-    --http-check-port=443 \
-    --http-check-use-ssl \
-    --http-check-validate-ssl \
+    --http-check="port=443,path=/,use-ssl,validate-ssl" \
     --period=300s \
     --timeout=10s \
     --format="value(name)")
