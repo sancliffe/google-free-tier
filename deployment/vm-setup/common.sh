@@ -28,6 +28,12 @@ log_success() {
     echo -e "$(date -u +"%Y-%m-%dT%H:%M:%SZ") [${GREEN}SUCCESS${NC}] $1"
 }
 
+log_debug() {
+    if [[ "${DEBUG:-}" == "true" ]]; then
+        echo -e "$(date -u +"%Y-%m-%dT%H:%M:%SZ") [DEBUG] $1"
+    fi
+}
+
 # -----------------------------------------------------------------------------
 # Error Handling & Mode Settings
 # -----------------------------------------------------------------------------
