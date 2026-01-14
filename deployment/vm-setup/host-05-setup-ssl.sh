@@ -72,18 +72,37 @@ main() {
     echo ""
     ensure_root || exit 1
 
-    # Initialize variables: prioritize command-line args, then env vars, then /run/secrets
+    # Initialize variables: prioritize command-line args, then env vars, then Google Cloud Secret Manager
     local DOMAIN="${1:-${DOMAIN:-}}"
     local EMAIL="${2:-${EMAIL_ADDRESS:-}}"
 
     if [[ -z "${DOMAIN}" || -z "${EMAIL}" ]]; then
-        log_info "Domain or email not provided as arguments or environment variables. Trying to read from /run/secrets..."
-        if [[ -f "/run/secrets/domain_name" && -f "/run/secrets/email_address" ]]; then
-            DOMAIN="${DOMAIN:-$(cat /run/secrets/domain_name)}"
-            EMAIL="${EMAIL:-$(cat /run/secrets/email_address)}"
-            log_info "Using credentials from /run/secrets."
+        log_info "Domain or email not provided as arguments or environment variables. Trying to read from Google Cloud Secret Manager..."
+        
+        # Get the GCP project ID
+        local PROJECT_ID
+        PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
+        if [[ -z "${PROJECT_ID}" ]]; then
+            log_error "Could not determine GCP project ID. Run: gcloud config set project PROJECT_ID"
+            exit 1
+        fi
+        
+        # Try to retrieve secrets from Google Cloud Secret Manager
+        if command -v gcloud &> /dev/null; then
+            DOMAIN="${DOMAIN:-$(gcloud secrets versions access latest --secret=domain_name --project="${PROJECT_ID}" 2>/dev/null || echo '')}"
+            EMAIL="${EMAIL:-$(gcloud secrets versions access latest --secret=email_address --project="${PROJECT_ID}" 2>/dev/null || echo '')}"
+            
+            if [[ -n "${DOMAIN}" && -n "${EMAIL}" ]]; then
+                log_info "Using credentials from Google Cloud Secret Manager."
+            else
+                log_error "Could not retrieve domain_name or email_address secrets from Google Cloud Secret Manager."
+                log_info "Ensure secrets were created with gcp-04-create-secrets.sh"
+                log_info "Usage: $0 [domain] [email]"
+                log_info "Or set DOMAIN and EMAIL_ADDRESS environment variables (from config.sh)"
+                exit 1
+            fi
         else
-            log_error "Required secrets not found as arguments, environment variables, or in /run/secrets."
+            log_error "gcloud CLI not found. Cannot access Google Cloud Secret Manager."
             log_info "Usage: $0 [domain] [email]"
             log_info "Or set DOMAIN and EMAIL_ADDRESS environment variables (from config.sh)"
             exit 1
