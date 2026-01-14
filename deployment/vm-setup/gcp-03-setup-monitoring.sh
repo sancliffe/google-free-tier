@@ -23,10 +23,11 @@ else
     log_warn() { echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") [WARN] $*"; }
 fi
 
-echo "------------------------------------------------------------"
+echo ""
+echo "$(printf '=%.0s' {1..60})"
 log_info "Starting GCP Monitoring Setup"
-echo "------------------------------------------------------------"
 log_info "Active Project: ${PROJECT_ID}"
+echo "$(printf '=%.0s' {1..60})"
 
 # Refresh authentication
 log_info "Refreshing authentication tokens..."
@@ -40,10 +41,10 @@ else
     log_warn "VM may need monitoring.write scope."
 fi
 
-echo "------------------------------------------------------------"
+echo ""
 
 # Step 1: Create or Get Notification Channel
-log_info "Step 1: Checking for existing Notification Channel..."
+log_info "Step 1/3: Checking for existing Notification Channel..."
 CHANNEL_ID=$(gcloud alpha monitoring channels list \
   --filter="displayName=\"${DISPLAY_NAME}\" AND type=\"email\"" \
   --format="value(name)")
@@ -62,7 +63,7 @@ else
   log_success "Found existing channel: ${CHANNEL_ID}"
 fi
 # Step 2: Create or Get Uptime Check
-log_info "Step 2: Checking for existing Uptime Check for ${DOMAIN}..."
+log_info "Step 2/3: Checking for existing Uptime Check for ${DOMAIN}..."
 # The gcloud command for this is not stable across versions, so we use grep.
 UPTIME_CHECK_ID=$(gcloud monitoring uptime list-configs \
   --project="${PROJECT_ID}" \
@@ -134,7 +135,7 @@ fi
 
 
 # Step 3: Create or Get Alert Policy
-log_info "Step 3: Checking for existing Alert Policy for ${DOMAIN}..."
+log_info "Step 3/3: Checking for existing Alert Policy for ${DOMAIN}..."
 ALERT_POLICY_ID=$(gcloud alpha monitoring policies list \
   --filter="displayName=\"Uptime Check Alert for ${DOMAIN}\"" \
   --format="value(name)")
@@ -184,9 +185,10 @@ else
     log_success "Found existing alert policy: ${ALERT_POLICY_ID}"
 fi
 
-echo "------------------------------------------------------------"
+echo ""
+echo "$(printf '=%.0s' {1..60})"
 log_success "Monitoring Setup Complete!"
-echo "------------------------------------------------------------"
+echo "$(printf '=%.0s' {1..60})"
 log_info "Summary:"
 log_info "  • Notification Channel: ${CHANNEL_ID}"
 log_info "  • Uptime Check: ${UPTIME_CHECK_ID}"

@@ -14,12 +14,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Function to log messages.
 log() {
-  echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')]: $*"
+  echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')]: $*"
 }
 
 # Function to log errors.
 log_error() {
-  echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] ERROR: $*" >&2
+  echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] ERROR: $*" >&2
 }
 
 declare -A config
@@ -118,8 +118,12 @@ verify_gcloud_auth() {
 
 # --- Main ---
 
+echo ""
+echo "$(printf '=%.0s' {1..60})"
 log "Starting GCP setup..."
 log "⏱️  Estimated time: 2-3 minutes"
+echo "$(printf '=%.0s' {1..60})"
+echo ""
 
 # Verify required tools
 for tool in gcloud jq; do
@@ -142,34 +146,37 @@ log "Checking existing resources..."
 SKIP_COUNT=0
 CREATE_COUNT=0
 
+echo ""
 # Check VM
 if gcloud compute instances describe "${config[VM_NAME]}" --zone="${config[ZONE]}" --project="${config[PROJECT_ID]}" &>/dev/null; then
-  log "  VM '${config[VM_NAME]}': Already exists ⏭️"
+  log "  ⏭️  VM '${config[VM_NAME]}': Already exists"
   SKIP_COUNT=$((SKIP_COUNT + 1))
 else
-  log "  VM '${config[VM_NAME]}': Will create ✨"
+  log "  ✨ VM '${config[VM_NAME]}': Will create"
   CREATE_COUNT=$((CREATE_COUNT + 1))
 fi
 
 # Check Firewall
 if gcloud compute firewall-rules describe "${config[FIREWALL_RULE_NAME]}" --project="${config[PROJECT_ID]}" &>/dev/null; then
-  log "  Firewall rule '${config[FIREWALL_RULE_NAME]}': Already exists ⏭️"
+  log "  ⏭️  Firewall rule '${config[FIREWALL_RULE_NAME]}': Already exists"
   SKIP_COUNT=$((SKIP_COUNT + 1))
 else
-  log "  Firewall rule '${config[FIREWALL_RULE_NAME]}': Will create ✨"
+  log "  ✨ Firewall rule '${config[FIREWALL_RULE_NAME]}': Will create"
   CREATE_COUNT=$((CREATE_COUNT + 1))
 fi
 
 # Check Artifact Registry
 if gcloud artifacts repositories describe "${config[REPO_NAME]}" --location="${config[REPO_LOCATION]}" --project="${config[PROJECT_ID]}" &>/dev/null; then
-  log "  Artifact Registry '${config[REPO_NAME]}': Already exists ⏭️"
+  log "  ⏭️  Artifact Registry '${config[REPO_NAME]}': Already exists"
   SKIP_COUNT=$((SKIP_COUNT + 1))
 else
-  log "  Artifact Registry '${config[REPO_NAME]}': Will create ✨"
+  log "  ✨ Artifact Registry '${config[REPO_NAME]}': Will create"
   CREATE_COUNT=$((CREATE_COUNT + 1))
 fi
 
-log "Summary: $CREATE_COUNT to create, $SKIP_COUNT to skip"
+echo ""
+log "📊 Summary: $CREATE_COUNT to create, $SKIP_COUNT to skip"
+echo ""
 read -p "Continue with setup? (y/N): " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -177,17 +184,22 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
   exit 0
 fi
 
+echo ""
+echo "$(printf '=%.0s' {1..60})"
+log "🚀 Starting setup execution..."
+echo "$(printf '=%.0s' {1..60})"
+
 # Execute setup scripts in order with correct filenames
-log "Step 1: Creating VM..."
+log "Step 1/5: Creating VM..."
 "${SCRIPT_DIR}/gcp-01-create-vm.sh" "${config[VM_NAME]}" "${config[ZONE]}" "${config[PROJECT_ID]}"
 
-log "Step 2: Opening firewall..."
+log "Step 2/5: Opening firewall..."
 "${SCRIPT_DIR}/gcp-02-firewall-open.sh" "${config[VM_NAME]}" "${config[ZONE]}" "${config[FIREWALL_RULE_NAME]}" "${config[PROJECT_ID]}" "${config[TAGS]}"
 
-log "Step 3: Setting up monitoring..."
+log "Step 3/5: Setting up monitoring..."
 "${SCRIPT_DIR}/gcp-03-setup-monitoring.sh" "${config[VM_NAME]}" "${config[ZONE]}" "${config[EMAIL_ADDRESS]}" "${config[DISPLAY_NAME]}" "${config[DOMAIN]}" "${config[PROJECT_ID]}"
 
-log "Step 4: Creating secrets..."
+log "Step 4/5: Creating secrets..."
 "${SCRIPT_DIR}/gcp-04-create-secrets.sh" \
   --project-id "${config[PROJECT_ID]}" \
   --duckdns-token "${config[DUCKDNS_TOKEN]}" \
@@ -198,11 +210,16 @@ log "Step 4: Creating secrets..."
   --backup-dir "${config[BACKUP_DIR]}" \
   --billing-account "${config[BILLING_ACCOUNT_ID]}"
 
-log "Step 5: Creating artifact registry..."
+log "Step 5/5: Creating artifact registry..."
 "${SCRIPT_DIR}/gcp-05-create-artifact-registry.sh" "${config[REPO_NAME]}" "${config[REPO_LOCATION]}" "${config[PROJECT_ID]}"
 
-log "GCP setup completed successfully!"
+echo ""
+echo "$(printf '=%.0s' {1..60})"
+log "✅ GCP setup completed successfully!"
+echo "$(printf '=%.0s' {1..60})"
 
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
-log "⏱️  Setup completed in $((DURATION / 60))m $((DURATION % 60))s"
+echo ""
+log "⏱️  Total setup time: $((DURATION / 60))m $((DURATION % 60))s"
+echo ""

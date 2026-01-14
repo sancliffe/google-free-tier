@@ -73,7 +73,39 @@ log_debug() {
     fi
 }
 
-# --- Root Check ---
+# --- Section Headers ---
+# Display a prominent section header with timestamp
+section_header() {
+    local title="$1"
+    local width=60
+    local timestamp
+    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    
+    echo ""
+    echo "$(printf '=%.0s' {1..60})"
+    echo "[${timestamp}] ${title}"
+    echo "$(printf '=%.0s' {1..60})"
+    echo ""
+}
+
+# Display a step header with automatic numbering
+log_step() {
+    local step_num="$1"
+    local description="$2"
+    local timestamp
+    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    
+    echo ""
+    echo "[${timestamp}] ➜ Step ${step_num}: ${description}"
+}
+
+# Display a sub-step or detail
+log_detail() {
+    local message="$1"
+    echo "  • ${message}"
+}
+
+# Root Check ---
 ensure_root() {
     if [[ "${EUID}" -ne 0 ]]; then
         log_error "This script must be run as root."

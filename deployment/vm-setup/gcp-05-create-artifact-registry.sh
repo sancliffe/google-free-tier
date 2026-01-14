@@ -17,9 +17,9 @@ COL_SUCCESS="\033[0;32m"
 COL_ERROR="\033[0;31m"
 COL_RESET="\033[0m"
 
-log_info()    { echo -e "${COL_INFO}[INFO]${COL_RESET} $1"; }
-log_success() { echo -e "${COL_SUCCESS}[SUCCESS]${COL_RESET} $1"; }
-log_error()   { echo -e "${COL_ERROR}[ERROR]${COL_RESET} $1"; }
+log_info()    { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] ${COL_INFO}[INFO]${COL_RESET} $1"; }
+log_success() { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] ${COL_SUCCESS}[SUCCESS]${COL_RESET} $1"; }
+log_error()   { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] ${COL_ERROR}[ERROR]${COL_RESET} $1"; }
 
 # --- Usage ---
 show_usage() {
@@ -44,7 +44,12 @@ EOF
         exit 1
     fi
 
-    log_info "Project: ${PROJECT_ID}, Repo: ${REPO_NAME}, Location: ${LOCATION}"
+    echo ""
+    echo "$(printf '=%.0s' {1..60})"
+    log_info "Artifact Registry Setup"
+    log_info "Project: ${PROJECT_ID} | Repo: ${REPO_NAME} | Location: ${LOCATION}"
+    echo "$(printf '=%.0s' {1..60})"
+    echo ""
 
     # Enable Required APIs
     log_info "Enabling Artifact Registry API..."
@@ -72,7 +77,6 @@ EOF
     # UPDATED: Removed the outer "rules": { ... } wrapper to comply with gcloud requirements.
     log_info "Preparing cleanup policy file..."
     POLICY_FILE=$(mktemp)
-    
     cat > "${POLICY_FILE}" << 'EOF'
 [
     {
@@ -134,10 +138,13 @@ EOF
     log_info "Configuring Docker authentication for ${LOCATION}-docker.pkg.dev..."
     gcloud auth configure-docker "${LOCATION}-docker.pkg.dev" --quiet
 
-    echo "------------------------------------------------------------"
+    echo ""
+    echo "$(printf '=%.0s' {1..60})"
     log_success "Artifact Registry Setup Complete!"
-    echo -e "Registry URI: ${COL_INFO}${LOCATION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}${COL_RESET}"
-    echo "------------------------------------------------------------"
+    echo "$(printf '=%.0s' {1..60})"
+    echo ""
+    log_info "Registry URI:"
+    log_info "  ${LOCATION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}"
     echo ""
     log_info "Next Steps:"
     log_info "  1. Build your Docker image:"

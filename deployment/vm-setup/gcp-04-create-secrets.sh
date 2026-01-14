@@ -63,9 +63,10 @@ if [[ -z "${PROJECT_ID}" ]]; then
     exit 1
 fi
 
-echo "============================================================"
+echo ""
+echo "$(printf '=%.0s' {1..60})"
 log_info "Creating Secrets in Project: ${PROJECT_ID}"
-echo "============================================================"
+echo "$(printf '=%.0s' {1..60})"
 
 TOTAL_SECRETS=7
 CURRENT_SECRET=0
@@ -108,9 +109,8 @@ create_secret() {
 }
 
 echo ""
-echo "============================================================"
 log_info "Creating secrets with provided values..."
-echo "============================================================"
+echo ""
 
 create_secret "duckdns_token" "${DUCKDNS_TOKEN}"
 create_secret "email_address" "${EMAIL_ADDRESS}"
@@ -121,9 +121,11 @@ create_secret "backup_dir" "${BACKUP_DIR}"
 create_secret "billing_account_id" "${BILLING_ACCOUNT_ID}"
 
 echo ""
-echo "============================================================"
+echo "$(printf '=%.0s' {1..60})"
 log_success "Secrets creation complete!"
-echo "============================================================"
+echo "$(printf '=%.0s' {1..60})"
+echo ""
 log_info "View secrets: gcloud secrets list --project=${PROJECT_ID}"
 log_info "Read secret: gcloud secrets versions access latest --secret=SECRET_NAME --project=${PROJECT_ID}"
+echo ""
 echo "============================================================"
