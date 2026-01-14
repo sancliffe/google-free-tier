@@ -30,7 +30,9 @@ jobs:
           cache-dependency-path: '**/package-lock.json'
 
       - name: Validate shell scripts
-        run: shellcheck -x **/*.sh
+        run: |
+          shopt -s globstar
+          shellcheck -x **/*.sh
 
       - name: Lint Dockerfile
         run: |
