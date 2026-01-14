@@ -31,9 +31,7 @@ log_success() { echo -e "${COL_SUCCESS}[SUCCESS]${COL_RESET} $1"; }
 log_error()   { echo -e "${COL_ERROR}[ERROR]${COL_RESET} $1"; }
 
 # --- Usage ---
-
 show_usage() {
-
     cat << EOF
 Usage: $0 [OPTIONS] 
 
@@ -45,7 +43,6 @@ OPTIONS:
     --project-id ID        GCP project ID (or use config.sh)
     -h, --help             Show this help message
 EOF
-
 }
 
 
@@ -103,7 +100,7 @@ main() {
 
                 ;; 
 
-        esac
+esac
 
     done
 
@@ -112,7 +109,7 @@ main() {
 
     if [[ -z "${PROJECT_ID}" ]]; then
 
-        PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
+        PROJECT_ID=$(command gcloud config get-value project 2>/dev/null)
 
     fi
 
@@ -136,7 +133,7 @@ main() {
 
     log_info "Enabling Artifact Registry API..."
 
-    gcloud services enable artifactregistry.googleapis.com --project="${PROJECT_ID}"
+    command gcloud services enable artifactregistry.googleapis.com --project="${PROJECT_ID}"
 
 
 
@@ -144,11 +141,11 @@ main() {
 
     log_info "Checking for Artifact Registry repository '${REPO_NAME}' in ${LOCATION}..."
 
-    if ! gcloud artifacts repositories describe "${REPO_NAME}" --location="${LOCATION}" --project="${PROJECT_ID}" &>/dev/null; then
+    if ! command gcloud artifacts repositories describe "${REPO_NAME}" --location="${LOCATION}" --project="${PROJECT_ID}" &>/dev/null; then
 
         log_info "Creating repository..."
 
-        gcloud artifacts repositories create "${REPO_NAME}" \
+        command gcloud artifacts repositories create "${REPO_NAME}" \
 
             --project="${PROJECT_ID}" \
 
@@ -219,7 +216,7 @@ EOF
 
     log_info "Applying cleanup policies..."
 
-    gcloud artifacts repositories set-cleanup-policies "${REPO_NAME}" \
+    command gcloud artifacts repositories set-cleanup-policies "${REPO_NAME}" \
 
         --project="${PROJECT_ID}" \
 
@@ -243,7 +240,7 @@ EOF
 
     log_info "Configuring Docker authentication for ${LOCATION}-docker.pkg.dev..."
 
-    gcloud auth configure-docker "${LOCATION}-docker.pkg.dev" --quiet
+    command gcloud auth configure-docker "${LOCATION}-docker.pkg.dev" --quiet
 
 
 
