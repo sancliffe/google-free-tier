@@ -29,7 +29,7 @@ log_success() {
 }
 
 # -----------------------------------------------------------------------------
-# Error Handling
+# Error Handling & Mode Settings
 # -----------------------------------------------------------------------------
 # Exit logic that can be trapped
 handle_error() {
@@ -38,6 +38,12 @@ handle_error() {
         log_error "An error occurred on line $1. Exit code: $exit_code"
         exit $exit_code
     fi
+}
+
+# Sets strict bash modes to fail on error, unset vars, or pipe failures
+set_strict_mode() {
+    set -euo pipefail
+    trap 'handle_error $LINENO' ERR
 }
 
 # -----------------------------------------------------------------------------
@@ -94,13 +100,29 @@ check_root() {
     fi
 }
 
+# Alias for check_root to match function naming in some scripts
+ensure_root() {
+    check_root
+}
+
 backup_file() {
     local file_path="$1"
+    local dest_dir="${2:-}" 
+    
     if [ -f "$file_path" ]; then
         local timestamp
         timestamp=$(date +%s)
-        cp "$file_path" "${file_path}.bak.${timestamp}"
-        log_success "Backed up '$file_path' to '${file_path}.bak.${timestamp}'"
+        local backup_path
+        
+        if [ -n "$dest_dir" ]; then
+             mkdir -p "$dest_dir"
+             backup_path="${dest_dir}/$(basename "$file_path").bak.${timestamp}"
+        else
+             backup_path="${file_path}.bak.${timestamp}"
+        fi
+        
+        cp "$file_path" "$backup_path"
+        log_success "Backed up '$file_path' to '$backup_path'"
     else
         log_warn "File '$file_path' does not exist, skipping backup."
     fi
@@ -111,4 +133,20 @@ wait_for_apt_lock() {
         log_info "Waiting for other apt processes to finish..."
         sleep 2
     done
+}
+
+check_disk_space() {
+    local path="$1"
+    local required_mb="$2"
+    
+    # Get available space in KB
+    local available_kb
+    available_kb=$(df -k --output=avail "$path" | tail -n 1)
+    local available_mb=$((available_kb / 1024))
+    
+    if [[ "$available_mb" -lt "$required_mb" ]]; then
+        log_error "Insufficient disk space on $path. Required: ${required_mb}MB, Available: ${available_mb}MB"
+        return 1
+    fi
+    log_info "Disk space check passed. Available: ${available_mb}MB"
 }
