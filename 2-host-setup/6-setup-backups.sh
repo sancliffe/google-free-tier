@@ -19,8 +19,8 @@ main() {
     log_info "--- Phase 6: Setting up Automated Backups ---"
     ensure_root || exit 1
 
-    local BUCKET_NAME="$1"
-    local BACKUP_DIR="$2"
+    local BUCKET_NAME="${1:-}"
+    local BACKUP_DIR="${2:-}"
 
     if [[ -z "${BUCKET_NAME}" || -z "${BACKUP_DIR}" ]]; then
         log_info "Bucket name or backup directory not provided as arguments. Trying to read from /run/secrets..."
