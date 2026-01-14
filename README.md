@@ -233,7 +233,7 @@ The scripts in `deployment/vm-setup/` are numbered for clarity. Run them in orde
 Creates a 2GB swap file to support the 1GB RAM limit of the e2-micro.
 
 ```bash
-sudo bash ./deployment/vm-setup/1-create-swap.sh
+sudo bash ./deployment/vm-setup/10-host-create-swap.sh
 ```
 
 **Validation:** Check swap is active:
@@ -247,7 +247,7 @@ swapon --show
 Installs and enables the web server.
 
 ```bash
-sudo bash ./deployment/vm-setup/2-install-nginx.sh
+sudo bash ./deployment/vm-setup/11-host-install-nginx.sh
 ```
 
 **Validation:** Visit your VM's external IP in a browser:
@@ -260,12 +260,12 @@ curl http://$(curl -s ifconfig.me)
 Configures a cron job to keep your dynamic DNS updated.
 
 ```bash
-bash ./deployment/vm-setup/3-setup-duckdns.sh
+bash ./deployment/vm-setup/12-host-setup-duckdns.sh
 ```
 
 Or provide arguments to skip prompts:
 ```bash
-bash ./deployment/vm-setup/3-setup-duckdns.sh "your-subdomain" "your-duckdns-token"
+bash ./deployment/vm-setup/12-host-setup-duckdns.sh "your-subdomain" "your-duckdns-token"
 ```
 
 **Validation:** Check the cron job:
@@ -278,12 +278,12 @@ crontab -l | grep duckdns
 Installs Let's Encrypt SSL certificates using Certbot.
 
 ```bash
-sudo bash ./deployment/vm-setup/4-setup-ssl.sh
+sudo bash ./deployment/vm-setup/13-host-setup-ssl.sh
 ```
 
 Or with arguments:
 ```bash
-sudo bash ./deployment/vm-setup/4-setup-ssl.sh "your-domain.duckdns.org" "your-email@example.com"
+sudo bash ./deployment/vm-setup/13-host-setup-ssl.sh "your-domain.duckdns.org" "your-email@example.com"
 ```
 
 **Important:** Ensure your domain is pointing to your server before running this script. The script performs a DNS pre-flight check.
@@ -298,7 +298,7 @@ curl https://your-domain.duckdns.org
 Configures `ufw` to allow Nginx traffic (if active).
 
 ```bash
-sudo bash ./deployment/vm-setup/5-firewall-config-host.sh
+sudo bash ./deployment/vm-setup/14-host-firewall-config.sh
 ```
 
 This script automatically checks if `ufw` is active before making changes.
@@ -309,10 +309,10 @@ Configures a daily cron job to back up your site to Google Cloud Storage.
 
 ```bash
 # Interactive mode
-sudo bash ./deployment/vm-setup/6-setup-backups.sh
+sudo bash ./deployment/vm-setup/15-host-setup-backups.sh
 
 # With arguments
-sudo bash ./deployment/vm-setup/6-setup-backups.sh "your-backup-bucket-name" "/var/www/html"
+sudo bash ./deployment/vm-setup/15-host-setup-backups.sh "your-backup-bucket-name" "/var/www/html"
 ```
 
 **Note:** You must create the GCS bucket first:
@@ -360,7 +360,7 @@ rm -r /tmp/restore-test/
 Installs Fail2Ban and configures unattended security updates.
 
 ```bash
-sudo bash ./deployment/vm-setup/7-setup-security.sh
+sudo bash ./deployment/vm-setup/16-host-setup-security.sh
 ```
 
 **Validation:** Check Fail2Ban status:
@@ -373,7 +373,7 @@ sudo fail2ban-client status
 Installs the Google Cloud Ops Agent to monitor Memory and Swap usage (metrics not available by default).
 
 ```bash
-sudo bash ./deployment/vm-setup/8-setup-ops-agent.sh
+sudo bash ./deployment/vm-setup/17-host-setup-ops-agent.sh
 ```
 
 This enables enhanced monitoring in Cloud Console for memory and swap metrics.
