@@ -167,6 +167,26 @@ This script will:
 
 The script is idempotent, meaning you can safely run it multiple times. After running the script, you can proceed to Phase 2.
 
+### Validate Setup
+
+After running the setup script, validate that all resources were created:
+
+```bash
+cd 1-gcp-setup
+bash validate-setup.sh
+```
+
+Expected output:
+```
+✓ VM 'free-tier-vm' exists
+✓ Firewall rule 'allow-http-https' exists
+✓ Artifact Registry 'gke-apps' exists
+✓ Found 6 secrets
+✓ Found 1 uptime check(s)
+
+Results: 5 passed, 0 failed
+```
+
 
 
 ## Phase 2: Host VM Setup (Manual)

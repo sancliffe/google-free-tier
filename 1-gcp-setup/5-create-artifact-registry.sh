@@ -173,8 +173,9 @@ EOF
         --policy="${POLICY_FILE}"; then
         log_success "Cleanup policies applied successfully."
     else
-        log_info "Cleanup policies not supported or failed to apply. This is optional and won't affect functionality."
-        log_info "You can manually set cleanup policies in the GCP Console if needed."
+        log_info "⚠️  Cleanup policies not yet supported in this region or failed to apply."
+        log_info "This is OPTIONAL and won't affect repository functionality."
+        log_info "You can manually configure cleanup policies in GCP Console > Artifact Registry if needed."
     fi
 
     # Clean up the temp file

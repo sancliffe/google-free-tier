@@ -90,14 +90,19 @@ echo "============================================================"
 log_info "Creating Secrets in Project: ${PROJECT_ID}"
 echo "============================================================"
 
+TOTAL_SECRETS=7
+CURRENT_SECRET=0
+
 # Function to create or update a secret
 create_secret() {
     local secret_name="$1"
     local secret_value="$2"
 
+    CURRENT_SECRET=$((CURRENT_SECRET + 1))
+
     if [[ -z "${secret_value}" ]]; then
         # This is not an error, just skipping creation
-        log_info "Secret value for '${secret_name}' is empty. Skipping."
+        log_info "[$CURRENT_SECRET/$TOTAL_SECRETS] Skipping '${secret_name}' (empty value)"
         return 0
     fi
 
@@ -105,23 +110,23 @@ create_secret() {
     if gcloud secrets describe "${secret_name}" --project="${PROJECT_ID}" &>/dev/null; then
         # Secret exists, check if the latest version matches
         local latest_value
-        latest_value=$(gcloud secrets versions access latest --secret="${secret_name}" --project="${PROJECT_ID}")
+        latest_value=$(gcloud secrets versions access latest --secret="${secret_name}" --project="${PROJECT_ID}" 2>/dev/null || echo "")
 
         if [[ "${latest_value}" == "${secret_value}" ]]; then
-            log_info "Secret '${secret_name}' is already up-to-date."
+            log_info "[$CURRENT_SECRET/$TOTAL_SECRETS] Secret '${secret_name}' is already up-to-date."
         else
-            log_warn "Secret '${secret_name}' exists but has a different value. Adding new version..."
+            log_warn "[$CURRENT_SECRET/$TOTAL_SECRETS] Secret '${secret_name}' exists but has a different value. Adding new version..."
             echo -n "${secret_value}" | gcloud secrets versions add "${secret_name}" --data-file=- --project="${PROJECT_ID}"
-            log_success "Updated secret: ${secret_name}"
+            log_success "[$CURRENT_SECRET/$TOTAL_SECRETS] Created/Updated '${secret_name}'"
         fi
     else
-        log_info "Creating secret: ${secret_name}"
+        log_info "[$CURRENT_SECRET/$TOTAL_SECRETS] Creating secret: ${secret_name}"
         echo -n "${secret_value}" | gcloud secrets create "${secret_name}" \
             --data-file=- \
             --replication-policy="automatic" \
             --labels="managed-by=script" \
             --project="${PROJECT_ID}"
-        log_success "Created secret: ${secret_name}"
+        log_success "[$CURRENT_SECRET/$TOTAL_SECRETS] Created/Updated '${secret_name}'"
     fi
 }
 
