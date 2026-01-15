@@ -86,29 +86,23 @@ POLICY_FILE=$(mktemp)
 cat > "${POLICY_FILE}" << 'EOF'
 [
     {
-        "name": "keep-last-five-production",
+        "name": "keep-production-tags",
         "action": {
-        "type": "KEEP"
+            "type": "KEEP"
         },
         "condition": {
-        "tagState": "TAGGED",
-        "tagPrefixes": ["production"]
-        },
-        "mostRecentVersions": {
-        "keepCount": 5
+            "tagState": "TAGGED",
+            "tagPrefixes": ["production"]
         }
     },
     {
-        "name": "keep-last-five-staging",
+        "name": "keep-staging-tags",
         "action": {
-        "type": "KEEP"
+            "type": "KEEP"
         },
         "condition": {
-        "tagState": "TAGGED",
-        "tagPrefixes": ["staging"]
-        },
-        "mostRecentVersions": {
-        "keepCount": 5
+            "tagState": "TAGGED",
+            "tagPrefixes": ["staging"]
         }
     },
     {

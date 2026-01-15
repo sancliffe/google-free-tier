@@ -97,7 +97,7 @@ else
 fi
 
 # Check GCS Backup Bucket
-if gcloud storage buckets describe "$GCS_BUCKET_NAME" --project="$PROJECT_ID" &>/dev/null; then
+if gcloud storage buckets describe "gs://$GCS_BUCKET_NAME" --project="$PROJECT_ID" &>/dev/null; then
   log_success "GCS Backup Bucket '$GCS_BUCKET_NAME' exists"
   PASS=$((PASS + 1))
 else
@@ -106,7 +106,7 @@ else
 fi
 
 # Check GCS Terraform State Bucket
-if gcloud storage buckets describe "$TF_STATE_BUCKET" --project="$PROJECT_ID" &>/dev/null; then
+if gcloud storage buckets describe "gs://$TF_STATE_BUCKET" --project="$PROJECT_ID" &>/dev/null; then
   log_success "GCS Terraform State Bucket '$TF_STATE_BUCKET' exists"
   PASS=$((PASS + 1))
 else
