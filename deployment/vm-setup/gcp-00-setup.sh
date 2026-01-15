@@ -22,7 +22,11 @@ set -euo pipefail
 # --- Import Common Functions and Config ---
 # Get the directory of the current script
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# shellcheck source=deployment/vm-setup/common.sh
 source "${SCRIPT_DIR}/common.sh"
+
+# shellcheck source=deployment/vm-setup/config.sh
 source "${SCRIPT_DIR}/config.sh"
 
 # --- Main Execution ---
