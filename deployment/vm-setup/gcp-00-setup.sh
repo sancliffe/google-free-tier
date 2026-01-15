@@ -183,7 +183,7 @@ run_command_with_retry() {
 
     if [[ $success -eq 0 ]]; then
         log_error "  $description failed after $retries attempts. Exiting."
-        cleanup_on_failure
+        cleanup_resources
         exit 1 # Ensure the script exits after cleanup
     fi
     return 0
