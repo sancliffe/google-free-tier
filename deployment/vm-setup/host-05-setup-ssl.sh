@@ -52,10 +52,17 @@ check_dns() {
         exit 1
     fi
     
-    # Use the first resolved IP
-    domain_ip="${all_ips[0]}"
-    
-    if [[ "${public_ip}" != "${domain_ip}" ]]; then
+    # Check if any of the resolved IPs match the public IP
+    local match_found=false
+    for ip in "${all_ips[@]}"; do
+        if [[ "${ip}" == "${public_ip}" ]]; then
+            match_found=true
+            break
+        fi
+    done
+
+    if [[ "${match_found}" == "false" ]]; then
+        domain_ip="${all_ips[0]}"
         log_error "DNS mismatch detected!"
         log_error "  - Your server's public IP: ${public_ip}"
         log_error "  - ${DOMAIN} resolves to:  ${domain_ip}"
