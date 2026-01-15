@@ -27,7 +27,7 @@ main() {
     log_info "Installing agent..."
     bash add-google-cloud-ops-agent-repo.sh --also-install
 
-    # FIXED: Check if Nginx metrics endpoint is actually available
+    # Check if Nginx metrics endpoint is available and configure accordingly
     log_info "Checking Nginx metrics availability..."
     local enable_nginx_metrics=false
     if curl -s -f http://127.0.0.1/stub_status > /dev/null; then
@@ -35,6 +35,22 @@ main() {
         enable_nginx_metrics=true
     else
         log_warn "Nginx stub_status NOT detected. Skipping Nginx metrics configuration."
+    fi
+
+    local nginx_config=""
+    local nginx_pipeline=""
+    if [[ "${enable_nginx_metrics}" == "true" ]]; then
+        nginx_config=$(cat <<'EOC'
+    nginx:
+      type: nginx
+      collection_interval: 60s
+EOC
+)
+        nginx_pipeline=$(cat <<'EOP'
+      nginx:
+        receivers: [nginx]
+EOP
+)
     fi
 
     log_info "Configuring agent..."

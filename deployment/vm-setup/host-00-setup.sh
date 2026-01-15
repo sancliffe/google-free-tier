@@ -186,3 +186,4 @@ print_banner
 
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
+log_info "⏱️  Total setup time: $((DURATION / 60))m $((DURATION % 60))s"

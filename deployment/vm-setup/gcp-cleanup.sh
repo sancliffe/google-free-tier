@@ -210,6 +210,66 @@ if [[ "${DELETE_ARTIFACT_REGISTRY}" == "true" ]]; then
     fi
 fi
 
+# 6. Delete GCS Buckets
+
+if [[ "${DELETE_GCS_BUCKETS}" == "true" ]]; then
+
+    log_info "Step 6: Deleting GCS buckets..."
+
+
+
+    # Convert to lowercase to match creation logic
+
+    GCS_BUCKET_NAME_LOWER=$(echo "${GCS_BUCKET_NAME:-}" | tr '[:upper:]' '[:lower:]')
+
+    TF_STATE_BUCKET_LOWER=$(echo "${TF_STATE_BUCKET:-}" | tr '[:upper:]' '[:lower:]')
+
+
+
+    if [[ -n "${GCS_BUCKET_NAME_LOWER}" ]] && gsutil ls "gs://${GCS_BUCKET_NAME_LOWER}" &>/dev/null; then
+
+        if ! gsutil rm -r "gs://${GCS_BUCKET_NAME_LOWER}"; then
+
+            log_warn "GCS bucket ${GCS_BUCKET_NAME_LOWER} could not be deleted."
+
+        else
+
+            log_success "Deleted GCS bucket: ${GCS_BUCKET_NAME_LOWER}"
+
+        fi
+
+    else
+
+        log_info "GCS bucket ${GCS_BUCKET_NAME_LOWER} not found or name is empty."
+
+    fi
+
+
+
+    if [[ -n "${TF_STATE_BUCKET_LOWER}" ]] && gsutil ls "gs://${TF_STATE_BUCKET_LOWER}" &>/dev/null; then
+
+        if ! gsutil rm -r "gs://${TF_STATE_BUCKET_LOWER}"; then
+
+            log_warn "GCS bucket ${TF_STATE_BUCKET_LOWER} could not be deleted."
+
+        else
+
+            log_success "Deleted GCS bucket: ${TF_STATE_BUCKET_LOWER}"
+
+        fi
+
+    else
+
+        log_info "GCS bucket ${TF_STATE_BUCKET_LOWER} not found or name is empty."
+
+    fi
+
+fi
+
+
+
 echo "------------------------------------------------------------"
+
 log_success "Cleanup Process Finished!"
+
 echo "------------------------------------------------------------"

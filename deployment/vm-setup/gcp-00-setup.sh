@@ -135,16 +135,7 @@ verify_gcloud_auth() {
     log_success "✓ gcloud authentication verified"
 }
 
-# Associative array to track which resources have been successfully created
-declare -A CREATED_STATUS=(
-    [VM]=false
-    [FIREWALL]=false
-    [MONITORING]=false
-    [GCS_BACKUP_BUCKET]=false
-    [GCS_TF_BUCKET]=false
-    [SECRETS]=false
-    [ARTIFACT_REGISTRY]=false
-)
+
 
 # Function to run a command with retries and error handling
 # Arguments:
@@ -184,7 +175,7 @@ run_command_with_retry() {
     if [[ $success -eq 0 ]]; then
         log_error "  $description failed after $retries attempts. Exiting."
         cleanup_resources
-        exit 1 # Ensure the script exits after cleanup
+        # The script exits within the cleanup_resources function.
     fi
     return 0
 }
@@ -309,25 +300,21 @@ printf '=%.0s' {1..60}; echo
 run_command_with_retry \
     "\"${SCRIPT_DIR}/gcp-01-create-vm.sh\" \"${config[VM_NAME]}\" \"${config[ZONE]}\" \"${config[PROJECT_ID]}\"" \
     "Step 1/8: Creating VM '${config[VM_NAME]}'"
-CREATED_STATUS[VM]=true
 
 run_command_with_retry \
     "\"${SCRIPT_DIR}/gcp-02-firewall-open.sh\" \"${config[VM_NAME]}\" \"${config[ZONE]}\" \"${config[FIREWALL_RULE_NAME]}\" \"${config[PROJECT_ID]}\" \"${config[TAGS]}\"" \
     "Step 2/8: Opening firewall rule '${config[FIREWALL_RULE_NAME]}'"
-CREATED_STATUS[FIREWALL]=true
 
 run_command_with_retry \
     "\"${SCRIPT_DIR}/gcp-03-setup-monitoring.sh\" \"${config[VM_NAME]}\" \"${config[ZONE]}\" \"${config[EMAIL_ADDRESS]}\" \"${config[DISPLAY_NAME]}\" \"${config[DOMAIN]}\" \"${config[PROJECT_ID]}\"" \
     "Step 3/8: Setting up monitoring"
-CREATED_STATUS[MONITORING]=true
 
 # NEW STEP: Create GCS Buckets
 log_info "Step 4/8: Creating GCS buckets..."
 if ! gsutil ls "gs://${config[GCS_BUCKET_NAME]}" &>/dev/null; then
   run_command_with_retry \
       "gsutil mb -p \"${config[PROJECT_ID]}\" \"gs://${config[GCS_BUCKET_NAME]}\"" \
-      "Creating GCS Backup Bucket '${config[GCS_BUCKET_NAME]}'"
-  CREATED_STATUS[GCS_BACKUP_BUCKET]=true
+      "Creating GCS Backup Bucket '${config[GCS_BUCKET_NAME]}'\"
 else
   log_info "  GCS Backup Bucket '${config[GCS_BUCKET_NAME]}' already exists, skipping creation."
 fi
@@ -335,8 +322,7 @@ fi
 if ! gsutil ls "gs://${config[TF_STATE_BUCKET]}" &>/dev/null; then
   run_command_with_retry \
       "gsutil mb -p \"${config[PROJECT_ID]}\" \"gs://${config[TF_STATE_BUCKET]}\"" \
-      "Creating GCS Terraform State Bucket '${config[TF_STATE_BUCKET]}'"
-  CREATED_STATUS[GCS_TF_BUCKET]=true
+      "Creating GCS Terraform State Bucket '${config[TF_STATE_BUCKET]}'\"
 else
   log_info "  GCS Terraform State Bucket '${config[TF_STATE_BUCKET]}' already exists, skipping creation."
 fi
@@ -344,12 +330,10 @@ fi
 run_command_with_retry \
     "\"${SCRIPT_DIR}/gcp-04-create-secrets.sh\" --project-id \"${config[PROJECT_ID]}\" --duckdns-token \"${config[DUCKDNS_TOKEN]}\" --email \"${config[EMAIL_ADDRESS]}\" --domain \"${config[DOMAIN]}\" --bucket \"${config[GCS_BUCKET_NAME]}\" --tf-state-bucket \"${config[TF_STATE_BUCKET]}\" --backup-dir \"${config[BACKUP_DIR]}\" --billing-account \"${config[BILLING_ACCOUNT_ID]}\"" \
     "Step 5/8: Creating secrets"
-CREATED_STATUS[SECRETS]=true
 
 run_command_with_retry \
     "\"${SCRIPT_DIR}/gcp-05-create-artifact-registry.sh\" \"${config[REPO_NAME]}\" \"${config[REPO_LOCATION]}\" \"${config[PROJECT_ID]}\"" \
-    "Step 6/8: Creating artifact registry '${config[REPO_NAME]}'"
-CREATED_STATUS[ARTIFACT_REGISTRY]=true
+    "Step 6/8: Creating artifact registry '${config[REPO_NAME]}'\"
 
 run_command_with_retry \
     "\"${SCRIPT_DIR}/gcp-06-validate.sh\"" \
