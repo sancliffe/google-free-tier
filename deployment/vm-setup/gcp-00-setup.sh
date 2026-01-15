@@ -314,6 +314,9 @@ cat > runner.sh <<EOF
 set -e
 cd /tmp/vm-setup
 
+# Fix DOS line endings if present, which can cause silent script failures
+sed -i 's/\r$//' *.sh
+
 # Export sensitive variables passed from local machine
 export DUCKDNS_TOKEN="${DUCKDNS_TOKEN}"
 export GCS_BUCKET_NAME="${GCS_BUCKET_NAME}"
