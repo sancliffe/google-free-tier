@@ -12,9 +12,13 @@ export PROJECT_ID="${PROJECT_ID:-$(gcloud config get-value project 2>/dev/null)}
 # The GCP zone to deploy resources in.
 export ZONE="us-west1-a"
 
+# The GCP region to deploy resources in.
+export REGION="${ZONE%-*}"
+
 # --- VM Settings ---
 # The name of the VM to create.
 export VM_NAME="free-tier-vm"
+export SERVICE_ACCOUNT_NAME="${VM_NAME}-sa"
 
 # --- Networking Settings ---
 # The name of the firewall rule to create.
@@ -39,10 +43,12 @@ export DISPLAY_NAME="Admin"
 
 # The domain name to monitor.
 export DOMAIN="your-domain.com"
+export ENABLE_MONITORING="true"
 
 # --- Secret Manager Settings ---
 # These are sensitive values and are best managed outside of version control.
 # You can leave them blank here and the scripts will prompt you for them.
+export USE_SECRET_MANAGER="true"
 export DUCKDNS_TOKEN=""
 export GCS_BUCKET_NAME=""
 export TF_STATE_BUCKET=""
@@ -56,7 +62,9 @@ echo "Configuration Loaded:"
 echo "----------------------------------------------------------------"
 echo "PROJECT_ID          : ${PROJECT_ID}"
 echo "ZONE                : ${ZONE}"
+echo "REGION              : ${REGION}"
 echo "VM_NAME             : ${VM_NAME}"
+echo "SERVICE_ACCOUNT_NAME: ${SERVICE_ACCOUNT_NAME}"
 echo "FIREWALL_RULE_NAME  : ${FIREWALL_RULE_NAME}"
 echo "TAGS                : ${TAGS}"
 echo "REPO_NAME           : ${REPO_NAME}"
@@ -64,6 +72,8 @@ echo "REPO_LOCATION       : ${REPO_LOCATION}"
 echo "EMAIL_ADDRESS       : ${EMAIL_ADDRESS}"
 echo "DISPLAY_NAME        : ${DISPLAY_NAME}"
 echo "DOMAIN              : ${DOMAIN}"
+echo "ENABLE_MONITORING   : ${ENABLE_MONITORING}"
+echo "USE_SECRET_MANAGER  : ${USE_SECRET_MANAGER}"
 echo "DUCKDNS_TOKEN       : ${DUCKDNS_TOKEN:+(set)}"
 echo "GCS_BUCKET_NAME     : ${GCS_BUCKET_NAME}"
 echo "TF_STATE_BUCKET     : ${TF_STATE_BUCKET}"

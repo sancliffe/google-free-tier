@@ -35,19 +35,19 @@ log_info "Starting GCP environment setup..."
 
 # 1. Configuration (Project, Region, Zone)
 log_info "Configuring GCP project settings..."
-if [[ -z "${config[PROJECT_ID]}" ]]; then
+if [[ -z "${PROJECT_ID}" ]]; then
   error_exit "PROJECT_ID is not set in config.sh"
 fi
 
 # Set project
-run_command gcloud config set project "${config[PROJECT_ID]}" "Setting GCP project to ${config[PROJECT_ID]}"
+run_command gcloud config set project "${PROJECT_ID}" "Setting GCP project to ${PROJECT_ID}"
 
 # Set compute region and zone (if provided, though region is usually sufficient for some resources)
-if [[ -n "${config[REGION]}" ]]; then
-  run_command gcloud config set compute/region "${config[REGION]}" "Setting compute region to ${config[REGION]}"
+if [[ -n "${REGION}" ]]; then
+  run_command gcloud config set compute/region "${REGION}" "Setting compute region to ${REGION}"
 fi
-if [[ -n "${config[ZONE]}" ]]; then
-  run_command gcloud config set compute/zone "${config[ZONE]}" "Setting compute zone to ${config[ZONE]}"
+if [[ -n "${ZONE}" ]]; then
+  run_command gcloud config set compute/zone "${ZONE}" "Setting compute zone to ${ZONE}"
 fi
 
 # 2. Enable Required APIs
@@ -76,16 +76,16 @@ done
 
 # 3. Reserve Static IP
 log_info "Reserving static IP address..."
-STATIC_IP_NAME="${config[VM_NAME]}-ip"
+STATIC_IP_NAME="${VM_NAME}-ip"
 IP_ADDRESS=""
 
 # Check if IP exists
-if gcloud compute addresses describe "$STATIC_IP_NAME" --region="${config[REGION]}" >/dev/null 2>&1; then
-  IP_ADDRESS=$(gcloud compute addresses describe "$STATIC_IP_NAME" --region="${config[REGION]}" --format="value(address)")
+if gcloud compute addresses describe "$STATIC_IP_NAME" --region="${REGION}" >/dev/null 2>&1; then
+  IP_ADDRESS=$(gcloud compute addresses describe "$STATIC_IP_NAME" --region="${REGION}" --format="value(address)")
   log_info "Static IP $STATIC_IP_NAME already exists: $IP_ADDRESS"
 else
-  run_command gcloud compute addresses create "$STATIC_IP_NAME" --region="${config[REGION]}" "Creating static IP $STATIC_IP_NAME"
-  IP_ADDRESS=$(gcloud compute addresses describe "$STATIC_IP_NAME" --region="${config[REGION]}" --format="value(address)")
+  run_command gcloud compute addresses create "$STATIC_IP_NAME" --region="${REGION}" "Creating static IP $STATIC_IP_NAME"
+  IP_ADDRESS=$(gcloud compute addresses describe "$STATIC_IP_NAME" --region="${REGION}" --format="value(address)")
   log_info "Created static IP $STATIC_IP_NAME: $IP_ADDRESS"
 fi
 
@@ -101,14 +101,14 @@ fi
 
 # 4. Create Service Account
 log_info "Creating Service Account..."
-SA_NAME="${config[SERVICE_ACCOUNT_NAME]}"
-SA_EMAIL="${SA_NAME}@${config[PROJECT_ID]}.iam.gserviceaccount.com"
+SA_NAME="${SERVICE_ACCOUNT_NAME}"
+SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 
 if gcloud iam service-accounts describe "$SA_EMAIL" >/dev/null 2>&1; then
   log_info "Service Account $SA_EMAIL already exists."
 else
   run_command gcloud iam service-accounts create "$SA_NAME" \
-    --display-name="Service Account for ${config[VM_NAME]}" \
+    --display-name="Service Account for ${VM_NAME}" \
     "Creating Service Account $SA_NAME"
 fi
 
@@ -127,7 +127,7 @@ ROLES=(
 for role in "${ROLES[@]}"; do
     # Check if policy binding already exists to avoid cluttering logs/errors? 
     # add-iam-policy-binding is idempotent but prints a lot.
-    run_command gcloud projects add-iam-policy-binding "${config[PROJECT_ID]}" \
+    run_command gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
       --member="serviceAccount:${SA_EMAIL}" \
       --role="$role" \
       "Granting $role to $SA_EMAIL" >/dev/null
@@ -136,13 +136,13 @@ done
 
 # 5. Create GCS Bucket for Backups
 log_info "Creating GCS bucket for backups..."
-BUCKET_NAME="${config[GCS_BUCKET_NAME]}"
+BUCKET_NAME="${GCS_BUCKET_NAME}"
 
 if gsutil ls -b "gs://${BUCKET_NAME}" >/dev/null 2>&1; then
   log_info "GCS Bucket gs://${BUCKET_NAME} already exists."
 else
   # Create bucket (standard storage, regional)
-  run_command gsutil mb -p "${config[PROJECT_ID]}" -c standard -l "${config[REGION]}" -b on "gs://${BUCKET_NAME}" "Creating GCS Bucket gs://${BUCKET_NAME}"
+  run_command gsutil mb -p "${PROJECT_ID}" -c standard -l "${REGION}" -b on "gs://${BUCKET_NAME}" "Creating GCS Bucket gs://${BUCKET_NAME}"
   # Enable versioning (recommended for backups)
   run_command gsutil versioning set on "gs://${BUCKET_NAME}" "Enabling versioning on gs://${BUCKET_NAME}"
   
@@ -174,7 +174,7 @@ log_info "=== Step 6.2: Configuring Firewall ==="
 "${SCRIPT_DIR}/gcp-02-firewall-open.sh"
 
 # 6.3 Monitoring (Optional)
-if [[ "${config[ENABLE_MONITORING]}" == "true" ]]; then
+if [[ "${ENABLE_MONITORING}" == "true" ]]; then
   log_info "=== Step 6.3: Setting up Monitoring ==="
   "${SCRIPT_DIR}/gcp-03-setup-monitoring.sh"
 else
@@ -182,7 +182,7 @@ else
 fi
 
 # 6.4 Secrets (Optional)
-if [[ "${config[USE_SECRET_MANAGER]}" == "true" ]]; then
+if [[ "${USE_SECRET_MANAGER}" == "true" ]]; then
     log_info "=== Step 6.4: Creating Secrets ==="
     "${SCRIPT_DIR}/gcp-04-create-secrets.sh"
 else
@@ -203,7 +203,7 @@ log_info "=== Step 6.5: Creating Artifact Registry ==="
 log_info "Waiting for VM to be ready for SSH..."
 # Simple loop to wait for SSH
 for i in {1..20}; do
-  if gcloud compute ssh "${config[VM_NAME]}" --zone="${config[ZONE]}" --command="echo SSH Ready" >/dev/null 2>&1; then
+  if gcloud compute ssh "${VM_NAME}" --zone="${ZONE}" --command="echo SSH Ready" >/dev/null 2>&1; then
     log_info "VM is SSH accessible."
     break
   fi
@@ -219,7 +219,7 @@ log_info "=== Uploading setup scripts to VM ==="
 
 # Use scp to copy files
 # Note: --recurse is for gcloud compute scp
-run_command gcloud compute scp --recurse "${SCRIPT_DIR}" "${config[VM_NAME]}:~/vm-setup" --zone="${config[ZONE]}" "Uploading setup scripts to VM"
+run_command gcloud compute scp --recurse "${SCRIPT_DIR}" "${VM_NAME}:~/vm-setup" --zone="${ZONE}" "Uploading setup scripts to VM"
 
 log_info "=== Executing Host Setup Scripts on VM ==="
 
@@ -268,8 +268,8 @@ HOST_SCRIPTS=(
 
 # Variables to pass explicitly
 VM_ENV_VARS=(
-  "DUCKDNS_TOKEN=${config[DUCKDNS_TOKEN]}"
-  "GCS_BUCKET_NAME=${config[GCS_BUCKET_NAME]}"
+  "DUCKDNS_TOKEN=${DUCKDNS_TOKEN}"
+  "GCS_BUCKET_NAME=${GCS_BUCKET_NAME}"
 )
 
 # Build the setup command
@@ -307,11 +307,11 @@ set -e
 cd ~/vm-setup
 
 # Export sensitive variables passed from local machine
-export DUCKDNS_TOKEN="${config[DUCKDNS_TOKEN]}"
-export GCS_BUCKET_NAME="${config[GCS_BUCKET_NAME]}"
-export PROJECT_ID="${config[PROJECT_ID]}"
-export REGION="${config[REGION]}"
-export ZONE="${config[ZONE]}"
+export DUCKDNS_TOKEN="${DUCKDNS_TOKEN}"
+export GCS_BUCKET_NAME="${GCS_BUCKET_NAME}"
+export PROJECT_ID="${PROJECT_ID}"
+export REGION="${REGION}"
+export ZONE="${ZONE}"
 
 # Make scripts executable
 chmod +x *.sh
@@ -324,12 +324,12 @@ for script in "${HOST_SCRIPTS[@]}"; do
 done
 
 # Upload the runner
-run_command gcloud compute scp runner.sh "${config[VM_NAME]}:~/vm-setup/runner.sh" --zone="${config[ZONE]}" "Uploading runner script"
+run_command gcloud compute scp runner.sh "${VM_NAME}:~/vm-setup/runner.sh" --zone="${ZONE}" "Uploading runner script"
 rm -f runner.sh
 
 # Execute the runner
 log_info "Executing runner script on VM..."
-run_command gcloud compute ssh "${config[VM_NAME]}" --zone="${config[ZONE]}" --command="chmod +x ~/vm-setup/runner.sh && ~/vm-setup/runner.sh" "Running host setup scripts"
+run_command gcloud compute ssh "${VM_NAME}" --zone="${ZONE}" --command="chmod +x ~/vm-setup/runner.sh && ~/vm-setup/runner.sh" "Running host setup scripts"
 
 # 7. Validation
 log_info "=== Step 7: Final Validation ==="
@@ -338,5 +338,5 @@ log_info "=== Step 7: Final Validation ==="
 log_info "GCP Environment Setup Complete!"
 echo ""
 echo "You can SSH into your VM using:"
-echo "gcloud compute ssh ${config[VM_NAME]} --zone=${config[ZONE]}"
+echo "gcloud compute ssh ${VM_NAME} --zone=${ZONE}"
 echo ""
