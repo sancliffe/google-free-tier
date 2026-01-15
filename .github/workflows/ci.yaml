@@ -50,8 +50,9 @@ jobs:
       - name: Lint YAML files
         run: |
           pip install yamllint
+          # UPDATED: Pointing to infrastructure/terraform/ instead of terraform/
           yamllint -c '{extends: default, rules: {line-length: {max: 120}, comments: {min-spaces-from-content: 1}}}' \
-            .github/ terraform/ 2>/dev/null || true
+            .github/ infrastructure/terraform/ 2>/dev/null || true
 
       - name: Validate documentation links
         run: |
@@ -79,9 +80,9 @@ jobs:
         uses: actions/cache@v3
         with:
           path: |
-            terraform/.terraform
+            infrastructure/terraform/.terraform
             ~/.terraform.d/plugin-cache
-          key: ${{ runner.os }}-terraform-${{ matrix.tf-version }}-${{ hashFiles('terraform/.terraform.lock.hcl') }}
+          key: ${{ runner.os }}-terraform-${{ matrix.tf-version }}-${{ hashFiles('infrastructure/terraform/.terraform.lock.hcl') }}
           restore-keys: |
             ${{ runner.os }}-terraform-${{ matrix.tf-version }}-
 
@@ -90,16 +91,17 @@ jobs:
         with:
           terraform_version: ${{ matrix.tf-version }}
 
+      # UPDATED: Working directories changed to infrastructure/terraform
       - name: Terraform Format Check
-        working-directory: terraform
+        working-directory: infrastructure/terraform
         run: terraform fmt -check -recursive
 
       - name: Terraform Init
-        working-directory: terraform
+        working-directory: infrastructure/terraform
         run: terraform init -backend=false
 
       - name: Terraform Validate
-        working-directory: terraform
+        working-directory: infrastructure/terraform
         run: terraform validate
 
   security:
@@ -143,13 +145,16 @@ jobs:
           cp CODE_OF_CONDUCT.md dist/CODE_OF_CONDUCT.md
           cp LICENSE dist/LICENSE
           
+          # UPDATED: Corrected paths and consolidated VM setup
           tar -czf dist/app.tar.gz app/
-          tar -czf dist/terraform.tar.gz terraform/
+          tar -czf dist/terraform.tar.gz infrastructure/terraform/
           tar -czf dist/scripts.tar.gz scripts/
-          tar -czf dist/host-setup.tar.gz 2-host-setup/
-          tar -czf dist/gcp-setup.tar.gz 1-gcp-setup/
-          tar -czf dist/cloud-run.tar.gz 3-cloud-run-deployment/
-          tar -czf dist/gke.tar.gz 3-gke-deployment/
+          
+          # Consolidated '1-gcp-setup' and '2-host-setup' into 'vm-setup'
+          tar -czf dist/vm-setup.tar.gz deployment/vm-setup/
+          
+          tar -czf dist/cloud-run.tar.gz deployment/cloud-run/
+          tar -czf dist/gke.tar.gz deployment/gke/
           
           cd dist
           sha256sum *.tar.gz *.md LICENSE > sha256sums.txt
@@ -197,8 +202,7 @@ jobs:
             dist/app.tar.gz
             dist/terraform.tar.gz
             dist/scripts.tar.gz
-            dist/host-setup.tar.gz
-            dist/gcp-setup.tar.gz
+            dist/vm-setup.tar.gz
             dist/cloud-run.tar.gz
             dist/gke.tar.gz
           body: |
@@ -212,8 +216,7 @@ jobs:
             - **scripts.tar.gz** - Utility and validation scripts
             
             ### Setup Scripts
-            - **host-setup.tar.gz** - VM configuration scripts (Phase 2)
-            - **gcp-setup.tar.gz** - GCP project setup scripts (Phase 1)
+            - **vm-setup.tar.gz** - Consolidated VM, Host, and GCP setup scripts (Phases 1 & 2)
             - **cloud-run.tar.gz** - Cloud Run deployment scripts (Phase 3)
             - **gke.tar.gz** - Kubernetes/GKE deployment scripts (Phase 4)
             
