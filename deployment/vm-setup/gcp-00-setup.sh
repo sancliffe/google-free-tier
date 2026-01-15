@@ -167,16 +167,16 @@ fi
 
 # 6.1 Create VM
 log_info "=== Step 6.1: Creating VM ==="
-"${SCRIPT_DIR}/gcp-01-create-vm.sh"
+"${SCRIPT_DIR}/gcp-01-create-vm.sh" "${VM_NAME}" "${ZONE}" "${PROJECT_ID}"
 
 # 6.2 Configure Firewall
 log_info "=== Step 6.2: Configuring Firewall ==="
-"${SCRIPT_DIR}/gcp-02-firewall-open.sh"
+"${SCRIPT_DIR}/gcp-02-firewall-open.sh" "${VM_NAME}" "${ZONE}" "${FIREWALL_RULE_NAME}" "${PROJECT_ID}" "${TAGS}"
 
 # 6.3 Monitoring (Optional)
 if [[ "${ENABLE_MONITORING}" == "true" ]]; then
   log_info "=== Step 6.3: Setting up Monitoring ==="
-  "${SCRIPT_DIR}/gcp-03-setup-monitoring.sh"
+  "${SCRIPT_DIR}/gcp-03-setup-monitoring.sh" "${VM_NAME}" "${ZONE}" "${EMAIL_ADDRESS}" "${DISPLAY_NAME}" "${DOMAIN}" "${PROJECT_ID}"
 else
   log_info "Skipping Monitoring setup (ENABLE_MONITORING != true)"
 fi
@@ -184,7 +184,15 @@ fi
 # 6.4 Secrets (Optional)
 if [[ "${USE_SECRET_MANAGER}" == "true" ]]; then
     log_info "=== Step 6.4: Creating Secrets ==="
-    "${SCRIPT_DIR}/gcp-04-create-secrets.sh"
+    "${SCRIPT_DIR}/gcp-04-create-secrets.sh" \
+        --duckdns-token "${DUCKDNS_TOKEN}" \
+        --email "${EMAIL_ADDRESS}" \
+        --domain "${DOMAIN}" \
+        --bucket "${GCS_BUCKET_NAME}" \
+        --tf-state-bucket "${TF_STATE_BUCKET}" \
+        --backup-dir "${BACKUP_DIR}" \
+        --billing-account "${BILLING_ACCOUNT_ID}" \
+        --project-id "${PROJECT_ID}"
 else
     log_info "Skipping Secret Manager setup (USE_SECRET_MANAGER != true)"
 fi
@@ -192,7 +200,7 @@ fi
 # 6.5 Artifact Registry (Optional)
 # If you plan to deploy containers
 log_info "=== Step 6.5: Creating Artifact Registry ==="
-"${SCRIPT_DIR}/gcp-05-create-artifact-registry.sh"
+"${SCRIPT_DIR}/gcp-05-create-artifact-registry.sh" "${REPO_NAME}" "${REPO_LOCATION}" "${PROJECT_ID}"
 
 
 # --- Post-Creation Setup on the VM ---
