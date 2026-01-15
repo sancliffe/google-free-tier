@@ -219,36 +219,19 @@ for i in {1..20}; do
   sleep 10
 done
 
+# Use a dynamic directory on the remote host to ensure freshness
+REMOTE_SETUP_DIR="/tmp/vm-setup-$(date +%s)"
+log_info "Using remote setup directory: ${REMOTE_SETUP_DIR}"
+
 log_info "=== Uploading setup scripts to VM ==="
 # We copy the entire current directory (deployment/vm-setup) to the VM
 # so it has access to all scripts and config.
-# Excluding common.sh and config.sh because they are needed, wait, we need everything.
-# We'll copy to a 'setup' directory in the home folder.
-
-# Use scp to copy files
-# Note: --recurse is for gcloud compute scp
-run_command gcloud compute scp --recurse "${SCRIPT_DIR}" "${VM_NAME}:/tmp/vm-setup" --zone="${ZONE}" "Uploading setup scripts to VM"
+run_command gcloud compute scp --recurse "${SCRIPT_DIR}" "${VM_NAME}:${REMOTE_SETUP_DIR}" --zone="${ZONE}" "Uploading setup scripts to VM"
 
 log_info "=== Executing Host Setup Scripts on VM ==="
 
 # We need to construct a command that runs the scripts in order.
-# We also need to ensure environment variables from config.sh are available, 
-# or rely on config.sh being present on the VM (which we just uploaded).
-# Since we uploaded the whole folder, the scripts on the VM can source config.sh relative to themselves.
-
-# However, config.sh might rely on local env vars if they were not hardcoded?
-# In this design, config.sh contains the values. If config.sh uses `export VAR=${VAR:-default}`, 
-# we need to ensure the values are set.
-# If the user edited config.sh locally, those values are in the file we uploaded. 
-# So sourcing config.sh on the VM should work, PROVIDED config.sh doesn't rely on 
-# environment variables from the *host* machine (the one running this script) that aren't in the file.
-
-# Let's look at how we run the remote script.
-# We'll make the scripts executable and run host-00-setup.sh which acts as a master script or run them individually.
-# Looking at the file list, there isn't a master 'host-all' script, but host-00-setup.sh seems like a good start or we run them sequentially here.
-# Wait, host-00-setup.sh is "setup".
-# Let's iterate through the host scripts.
-
+# The scripts on the VM can source config.sh relative to themselves.
 HOST_SCRIPTS=(
   "host-00-setup.sh"
   "host-01-create-swap.sh"
@@ -263,56 +246,14 @@ HOST_SCRIPTS=(
   "host-cleanup.sh"
 )
 
-# Prepare the remote command execution
-# We want to run this in a non-interactive shell.
-# We need to make sure 'config.sh' variables are respected.
-# The scripts source common.sh and config.sh.
-
-# Issue: DUCKDNS_TOKEN might be sensitive and not in config.sh if passed via ENV.
-# If config.sh has `DUCKDNS_TOKEN=${DUCKDNS_TOKEN:-""}`, and we run on VM, it will be empty unless we export it.
-
-# We will construct a block of exports for variables that might be sensitive or dynamic.
-# Explicitly passing critical config vars as environment variables to the remote SSH command.
-
-# Variables to pass explicitly
-VM_ENV_VARS=(
-  "DUCKDNS_TOKEN=${DUCKDNS_TOKEN}"
-  "GCS_BUCKET_NAME=${GCS_BUCKET_NAME}"
-)
-
-# Build the setup command
-# We use a heredoc to define the remote script execution for cleanliness
-# BUT passing env vars to gcloud ssh command property is tricky. 
-# Best way: Prepend exports to the command string.
-
-ENV_SETUP_COMMAND=""
-for var_entry in "${VM_ENV_VARS[@]}"; do
-  # Split key and value
-  KEY="${var_entry%%=*}"
-  VALUE="${var_entry#*=}"
-  # Escape value for shell safety (basic)
-  # This simple escaping might not handle all edge cases but suffices for typical tokens
-  ESCAPED_VALUE=$(printf '%q' "$VALUE")
-  # Append to command string. We export them and also append to .bashrc for persistence if needed
-  # (though usually only needed for the session).
-  # Persistence is useful for cron jobs or future sessions.
-  ENV_SETUP_COMMAND+="export $KEY=$ESCAPED_VALUE; "
-  # Optional: Persist to .bashrc on VM (be careful with secrets)
-  # ENV_SETUP_COMMAND+="echo 'export $KEY=$ESCAPED_VALUE' >> ~/.bashrc; "
-done
-
-# Fix for ShellCheck errors SC1078, SC1079:
-# Ensure quotes are properly closed and variable expansion is safe.
-# We will use a simpler approach for the remote command to avoid complex nested quoting hell.
 # We will write a temporary runner script on the remote machine.
-
 log_info "Generating remote runner script..."
 
 # Create a temporary runner script locally
 cat > runner.sh <<EOF
 #!/bin/bash
 set -e
-cd /tmp/vm-setup
+cd "${REMOTE_SETUP_DIR}"
 
 # Fix DOS line endings if present, which can cause silent script failures
 sed -i 's/\r$//' *.sh
@@ -336,12 +277,12 @@ for script in "${HOST_SCRIPTS[@]}"; do
 done
 
 # Upload the runner
-run_command gcloud compute scp runner.sh "${VM_NAME}:/tmp/vm-setup/runner.sh" --zone="${ZONE}" "Uploading runner script"
+run_command gcloud compute scp runner.sh "${VM_NAME}:${REMOTE_SETUP_DIR}/runner.sh" --zone="${ZONE}" "Uploading runner script"
 rm -f runner.sh
 
 # Execute the runner
 log_info "Executing runner script on VM..."
-run_command gcloud compute ssh "${VM_NAME}" --zone="${ZONE}" --command="chmod +x /tmp/vm-setup/runner.sh && sudo /tmp/vm-setup/runner.sh" "Running host setup scripts"
+run_command gcloud compute ssh "${VM_NAME}" --zone="${ZONE}" --command="chmod +x ${REMOTE_SETUP_DIR}/runner.sh && sudo ${REMOTE_SETUP_DIR}/runner.sh" "Running host setup scripts"
 
 # 7. Validation
 log_info "=== Step 7: Final Validation ==="
