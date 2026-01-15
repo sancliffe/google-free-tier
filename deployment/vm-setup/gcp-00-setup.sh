@@ -337,7 +337,7 @@ rm -f runner.sh
 
 # Execute the runner
 log_info "Executing runner script on VM..."
-run_command gcloud compute ssh "${VM_NAME}" --zone="${ZONE}" --command="chmod +x ~/vm-setup/runner.sh && ~/vm-setup/runner.sh" "Running host setup scripts"
+run_command gcloud compute ssh "${VM_NAME}" --zone="${ZONE}" --command="chmod +x ~/vm-setup/runner.sh && sudo ~/vm-setup/runner.sh" "Running host setup scripts"
 
 # 7. Validation
 log_info "=== Step 7: Final Validation ==="
