@@ -2,9 +2,9 @@
 # host-02-setup-duckdns.sh
 # Sets up a cron job to update DuckDNS for dynamic IP.
 
-set_strict_mode
 # shellcheck disable=SC1091
 source "$(dirname "$0")/common.sh"
+set_strict_mode
 
 print_newline
 log_info "Starting DuckDNS setup..."

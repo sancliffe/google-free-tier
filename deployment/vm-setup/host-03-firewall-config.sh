@@ -2,9 +2,9 @@
 # host-03-firewall-config.sh
 # Configures UFW (Uncomplicated Firewall) on the host.
 
-set_strict_mode
 # shellcheck disable=SC1091
 source "$(dirname "$0")/common.sh"
+set_strict_mode
 
 print_newline
 log_info "Starting Firewall configuration..."

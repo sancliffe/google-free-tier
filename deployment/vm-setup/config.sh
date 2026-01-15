@@ -27,6 +27,11 @@ export FIREWALL_RULE_NAME="allow-http-https"
 # The network tags to apply to the VM.
 export TAGS="http-server,https-server"
 
+# The source IP range to allow for SSH access.
+# WARNING: '0.0.0.0/0' is insecure and allows SSH from anywhere.
+# For production, change this to a specific IP address or range.
+export SSH_ALLOWED_IPS="0.0.0.0/0"
+
 # --- Artifact Registry Settings ---
 # The name of the Artifact Registry repository to create.
 export REPO_NAME="gke-apps"
@@ -67,6 +72,7 @@ echo "VM_NAME             : ${VM_NAME}"
 echo "SERVICE_ACCOUNT_NAME: ${SERVICE_ACCOUNT_NAME}"
 echo "FIREWALL_RULE_NAME  : ${FIREWALL_RULE_NAME}"
 echo "TAGS                : ${TAGS}"
+echo "SSH_ALLOWED_IPS     : ${SSH_ALLOWED_IPS}"
 echo "REPO_NAME           : ${REPO_NAME}"
 echo "REPO_LOCATION       : ${REPO_LOCATION}"
 echo "EMAIL_ADDRESS       : ${EMAIL_ADDRESS}"
