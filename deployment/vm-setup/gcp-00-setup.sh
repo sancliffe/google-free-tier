@@ -314,7 +314,7 @@ log_info "Step 4/8: Creating GCS buckets..."
 if ! gsutil ls "gs://${config[GCS_BUCKET_NAME]}" &>/dev/null; then
   run_command_with_retry \
       "gsutil mb -p \"${config[PROJECT_ID]}\" \"gs://${config[GCS_BUCKET_NAME]}\"" \
-      "Creating GCS Backup Bucket '${config[GCS_BUCKET_NAME]}'\"
+      "Creating GCS Backup Bucket '${config[GCS_BUCKET_NAME]}'"
 else
   log_info "  GCS Backup Bucket '${config[GCS_BUCKET_NAME]}' already exists, skipping creation."
 fi
@@ -322,7 +322,7 @@ fi
 if ! gsutil ls "gs://${config[TF_STATE_BUCKET]}" &>/dev/null; then
   run_command_with_retry \
       "gsutil mb -p \"${config[PROJECT_ID]}\" \"gs://${config[TF_STATE_BUCKET]}\"" \
-      "Creating GCS Terraform State Bucket '${config[TF_STATE_BUCKET]}'\"
+      "Creating GCS Terraform State Bucket '${config[TF_STATE_BUCKET]}'"
 else
   log_info "  GCS Terraform State Bucket '${config[TF_STATE_BUCKET]}' already exists, skipping creation."
 fi
@@ -333,7 +333,7 @@ run_command_with_retry \
 
 run_command_with_retry \
     "\"${SCRIPT_DIR}/gcp-05-create-artifact-registry.sh\" \"${config[REPO_NAME]}\" \"${config[REPO_LOCATION]}\" \"${config[PROJECT_ID]}\"" \
-    "Step 6/8: Creating artifact registry '${config[REPO_NAME]}'\"
+    "Step 6/8: Creating artifact registry '${config[REPO_NAME]}'""
 
 run_command_with_retry \
     "\"${SCRIPT_DIR}/gcp-06-validate.sh\"" \
