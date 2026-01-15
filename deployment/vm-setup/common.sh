@@ -122,13 +122,16 @@ fetch_secret() {
     fi
 
     # 2. Try Environment Variable (if passed as argument)
-    if [[ -n "$env_var_name" && -n "${!env_var_name}" ]]; then
-        # Check if variable is set in current environment
-        echo "${!env_var_name}"
-        return 0
-    else
-        log_debug "fetch_secret: Environment variable '$env_var_name' not set or empty."
+    if [[ -n "$env_var_name" ]]; then
+        # Use a default value in the expansion to avoid unbound variable error with `set -u`
+        # when the variable is set but empty. However, we must first check if env_var_name is set.
+        local value="${!env_var_name:-}"
+        if [[ -n "$value" ]]; then
+            echo "$value"
+            return 0
+        fi
     fi
+    log_debug "fetch_secret: Environment variable '$env_var_name' not set or empty."
 
     # 3. Try reading from a local config.sh file (Fallback)
     local script_dir
