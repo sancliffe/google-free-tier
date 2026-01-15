@@ -136,7 +136,7 @@ while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
   fi
   
   if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
-    echo "IAM not yet propagated. Attempt $ATTEMPT/$MAX_ATTEMPTS. Waiting ${RETRY_DELAY}s..."
+    echo "IAM not yet propagated. Attempt $ATTEMPT/$MAX_ATTEMPTS. Waiting $${RETRY_DELAY}s..."
     sleep $RETRY_DELAY
     RETRY_DELAY=$((RETRY_DELAY * 2))
     # Cap exponential backoff at 60 seconds
@@ -146,7 +146,7 @@ while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
   fi
 done
 
-echo "✗ Timed out waiting for IAM propagation after $MAX_ATTEMPTS attempts (max wait: ~${RETRY_DELAY}s)"
+echo "✗ Timed out waiting for IAM propagation after $MAX_ATTEMPTS attempts (max wait: ~$${RETRY_DELAY}s)"
 exit 1
 EOF
   }

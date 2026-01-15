@@ -76,19 +76,11 @@ resource "google_project_service" "firestore" {
   disable_on_destroy = false
 }
 
-# Check if default database already exists
-data "google_firestore_database" "existing" {
-  count    = var.enable_firestore_database ? 1 : 0
-  project  = var.project_id
-  database = "(default)"
-
-  depends_on = [google_project_service.firestore]
-}
-
-# Only create the database if it doesn't already exist
-# This prevents "database already exists" errors on subsequent Terraform runs
+# Only create the database if enabled.
+# Note: If the database was already created (e.g. by App Engine), you may need to
+# run 'terraform import google_firestore_database.database "(default)"'
 resource "google_firestore_database" "database" {
-  count       = var.enable_firestore_database && (length(data.google_firestore_database.existing[*].id) == 0 || data.google_firestore_database.existing[0].id == "") ? 1 : 0
+  count       = var.enable_firestore_database ? 1 : 0
   project     = var.project_id
   name        = "(default)"
   location_id = var.region

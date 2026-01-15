@@ -51,7 +51,7 @@ locals {
   image_url = "${var.artifact_registry_region}-docker.pkg.dev/${var.project_id}/gke-apps/hello-app:${var.image_tag}"
 
   # Pass variables to the deployment template
-  deployment_yaml = templatefile("${path.module}/../3-gke-deployment/kubernetes/deployment.yaml.tpl", {
+  deployment_yaml = templatefile("${path.module}/../kubernetes/deployment.yaml.tpl", {
     image      = local.image_url
     project_id = var.project_id
     assets_url = var.assets_bucket_name != "" ? "https://storage.googleapis.com/${google_storage_bucket.assets_bucket[0].name}" : ""
@@ -73,7 +73,7 @@ resource "google_compute_global_address" "gke_static_ip" {
 
 resource "kubectl_manifest" "gke_service" {
   count     = var.enable_gke ? 1 : 0
-  yaml_body = file("${path.module}/../3-gke-deployment/kubernetes/service.yaml")
+  yaml_body = file("${path.module}/../kubernetes/service.yaml")
   depends_on = [
     kubectl_manifest.gke_deployment,
   ]
@@ -81,7 +81,7 @@ resource "kubectl_manifest" "gke_service" {
 
 resource "kubectl_manifest" "managed_certificate" {
   count = var.enable_gke ? 1 : 0
-  yaml_body = templatefile("${path.module}/../3-gke-deployment/kubernetes/managed-certificate.yaml.tpl", {
+  yaml_body = templatefile("${path.module}/../kubernetes/managed-certificate.yaml.tpl", {
     domain_name = var.domain_name
   })
   depends_on = [
@@ -91,7 +91,7 @@ resource "kubectl_manifest" "managed_certificate" {
 
 resource "kubectl_manifest" "ingress" {
   count     = var.enable_gke ? 1 : 0
-  yaml_body = file("${path.module}/../3-gke-deployment/kubernetes/ingress.yaml")
+  yaml_body = file("${path.module}/../kubernetes/ingress.yaml")
   depends_on = [
     kubectl_manifest.gke_service,
   ]
