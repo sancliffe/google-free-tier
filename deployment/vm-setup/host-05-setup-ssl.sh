@@ -13,7 +13,10 @@ check_dns() {
     log_info "Performing DNS pre-flight check for ${DOMAIN}..."
     
     # Verify dig is available
-    ensure_command "dig" "Install: sudo apt-get install dnsutils" || exit 1
+    if ! command -v dig &> /dev/null; then
+        log_error "Command 'dig' not found. Install: sudo apt-get install dnsutils"
+        exit 1
+    fi
     
     # Get public IP with timeout
     log_debug "Retrieving public IP address..."
