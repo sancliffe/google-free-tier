@@ -19,12 +19,12 @@ GCS_BUCKET_NAME="" # Added for GCS cleanup
 TF_STATE_BUCKET="" # Added for GCS cleanup
 
 # Flags to control selective deletion
-DELETE_VM=false
-DELETE_FIREWALL=false
-DELETE_MONITORING=false
-DELETE_SECRETS=false
-DELETE_ARTIFACT_REGISTRY=false
-DELETE_GCS_BUCKETS=false # This flag will control both backup and tf state buckets
+DELETE_VM=true
+DELETE_FIREWALL=true
+DELETE_MONITORING=true
+DELETE_SECRETS=true
+DELETE_ARTIFACT_REGISTRY=true
+DELETE_GCS_BUCKETS=true # This flag will control both backup and tf state buckets
 
 # Source config file if it exists
 if [[ -f "${CONFIG_FILE}" ]]; then
@@ -38,7 +38,7 @@ show_usage() {
     cat << EOF
 Usage: $0 [OPTIONS]
 
-Deletes the GCP resources created by the setup scripts.
+Deletes the GCP resources created by the setup scripts. By default, all resources are deleted.
 
 OPTIONS:
     --vm-name NAME         The name of the VM to delete (default: ${VM_NAME})
@@ -47,6 +47,12 @@ OPTIONS:
     --repo-name NAME       The Artifact Registry repo name (default: ${REPO_NAME})
     --repo-location REGION The repo's GCP region (default: ${REPO_LOCATION})
     --project-id ID        GCP project ID (or use config.sh)
+    --no-vm                Do not delete the VM instance.
+    --no-firewall          Do not delete the firewall rule.
+    --no-monitoring        Do not delete monitoring resources.
+    --no-secrets           Do not delete secrets.
+    --no-artifact-registry Do not delete the Artifact Registry repository.
+    --no-gcs-buckets       Do not delete the GCS buckets.
     -h, --help             Show this help message
 EOF
 }
@@ -54,14 +60,20 @@ EOF
 # --- Argument Parsing ---
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --vm-name)         VM_NAME="$2"; shift 2;;
-        --zone)            ZONE="$2"; shift 2;;
-        --firewall-rule-name) FIREWALL_RULE_NAME="$2"; shift 2;;
-        --repo-name)       REPO_NAME="$2"; shift 2;;
-        --repo-location)   REPO_LOCATION="$2"; shift 2;;
-        --project-id)      PROJECT_ID="$2"; shift 2;;
-        -h|--help)         show_usage; exit 0;;
-        *)                 echo "Unknown option: $1"; show_usage; exit 1;;
+        --vm-name)              VM_NAME="$2"; shift 2;;
+        --zone)                 ZONE="$2"; shift 2;;
+        --firewall-rule-name)   FIREWALL_RULE_NAME="$2"; shift 2;;
+        --repo-name)            REPO_NAME="$2"; shift 2;;
+        --repo-location)        REPO_LOCATION="$2"; shift 2;;
+        --project-id)           PROJECT_ID="$2"; shift 2;;
+        --no-vm)                DELETE_VM=false; shift;;
+        --no-firewall)          DELETE_FIREWALL=false; shift;;
+        --no-monitoring)        DELETE_MONITORING=false; shift;;
+        --no-secrets)           DELETE_SECRETS=false; shift;;
+        --no-artifact-registry) DELETE_ARTIFACT_REGISTRY=false; shift;;
+        --no-gcs-buckets)       DELETE_GCS_BUCKETS=false; shift;;
+        -h|--help)              show_usage; exit 0;;
+        *)                      echo "Unknown option: $1"; show_usage; exit 1;;
     esac
 done
 
