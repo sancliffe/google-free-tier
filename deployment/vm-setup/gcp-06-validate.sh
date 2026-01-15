@@ -36,6 +36,10 @@ done
 
 echo ""
 
+# Convert bucket names to lowercase to match creation logic
+GCS_BUCKET_NAME=$(echo "${GCS_BUCKET_NAME:-}" | tr '[:upper:]' '[:lower:]')
+TF_STATE_BUCKET=$(echo "${TF_STATE_BUCKET:-}" | tr '[:upper:]' '[:lower:]')
+
 PASS=0
 FAIL=0
 
