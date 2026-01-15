@@ -16,7 +16,7 @@ check_root
 
 # 1. Fetch Credentials
 log_info "Fetching DuckDNS credentials..."
-DUCKDNS_DOMAIN=$(fetch_secret "duckdns_domain" "DUCKDNS_DOMAIN")
+DUCKDNS_DOMAIN=$(fetch_secret "domain_name" "DOMAIN")
 DUCKDNS_TOKEN=$(fetch_secret "duckdns_token" "DUCKDNS_TOKEN")
 
 if [[ -z "$DUCKDNS_DOMAIN" || -z "$DUCKDNS_TOKEN" ]]; then
