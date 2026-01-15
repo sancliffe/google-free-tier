@@ -5,7 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="${SCRIPT_DIR}/config.sh"
 
 # shellcheck source=/dev/null
-if [[ -f "${SCRIPT_DIR}/common.sh" ]]; then\n    source "${SCRIPT_DIR}/common.sh"
+if [[ -f "${SCRIPT_DIR}/common.sh" ]]; then
+    source "${SCRIPT_DIR}/common.sh"
 else
     CYAN='\033[0;36m'
     GREEN='\033[0;32m'
