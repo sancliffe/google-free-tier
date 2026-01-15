@@ -86,3 +86,4 @@ echo "TF_STATE_BUCKET     : ${TF_STATE_BUCKET}"
 echo "BACKUP_DIR          : ${BACKUP_DIR}"
 echo "BILLING_ACCOUNT_ID  : ${BILLING_ACCOUNT_ID}"
 echo "----------------------------------------------------------------"
+
