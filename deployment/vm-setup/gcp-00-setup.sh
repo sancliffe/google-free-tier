@@ -318,6 +318,7 @@ cd /tmp/vm-setup
 sed -i 's/\r$//' *.sh
 
 # Export sensitive variables passed from local machine
+export DEBUG="true"
 export DUCKDNS_TOKEN="${DUCKDNS_TOKEN}"
 export GCS_BUCKET_NAME="${GCS_BUCKET_NAME}"
 export PROJECT_ID="${PROJECT_ID}"
