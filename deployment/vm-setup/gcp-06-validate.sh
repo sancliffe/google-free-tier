@@ -5,12 +5,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="${SCRIPT_DIR}/config.sh"
 
 # shellcheck source=/dev/null
-if [[ -f "${SCRIPT_DIR}/common.sh" ]]; then
-    source "${SCRIPT_DIR}/common.sh"
+if [[ -f "${SCRIPT_DIR}/common.sh" ]]; then\n    source "${SCRIPT_DIR}/common.sh"
 else
-    log_info() { echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [INFO] $*"; }
-    log_error() { echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [ERROR] $*" >&2; }
-    log_success() { echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [✅ SUCCESS] $*"; }
+    CYAN='\033[0;36m'
+    GREEN='\033[0;32m'
+    RED='\033[0;31m'
+    NC='\033[0m'
+    log_info() { echo -e "$(date -u +'%Y-%m-%dT%H:%M:%SZ') ${CYAN}[INFO]${NC} $*"; }
+    log_error() { echo -e "$(date -u +'%Y-%m-%dT%H:%M:%SZ') ${RED}[ERROR]${NC} $*" >&2; }
+    log_success() { echo -e "$(date -u +'%Y-%m-%dT%H:%M:%SZ') ${GREEN}[✅ SUCCESS]${NC} $*"; }
 fi
 
 if [[ -f "${CONFIG_FILE}" ]]; then

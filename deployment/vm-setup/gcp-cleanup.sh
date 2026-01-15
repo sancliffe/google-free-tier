@@ -61,10 +61,15 @@ if [[ -f "${SCRIPT_DIR}/common.sh" ]]; then
     source "${SCRIPT_DIR}/common.sh"
 else
     # Fallback logging functions if common.sh is not available
-    log_info()    { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] \033[0;36m[INFO]\033[0m $*"; }
-    log_success() { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] \033[0;32m[✅ SUCCESS]\033[0m $*"; }
-    log_warn()    { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] \033[0;33m[WARN]\033[0m $*"; }
-    log_error()   { echo -e "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] \033[0;31m[ERROR]\033[0m $*"; }
+    CYAN='\033[0;36m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[0;33m'
+    RED='\033[0;31m'
+    NC='\033[0m'
+    log_info()    { echo -e "$(date -u +'%Y-%m-%dT%H:%M:%SZ') ${CYAN}[INFO]${NC} $*"; }
+    log_success() { echo -e "$(date -u +'%Y-%m-%dT%H:%M:%SZ') ${GREEN}[✅ SUCCESS]${NC} $*"; }
+    log_warn()    { echo -e "$(date -u +'%Y-%m-%dT%H:%M:%SZ') ${YELLOW}[WARN]${NC} $*"; }
+    log_error()   { echo -e "$(date -u +'%Y-%m-%dT%H:%M:%SZ') ${RED}[ERROR]${NC} $*" >&2; }
 fi
 
 # If PROJECT_ID is not set by args or config, get it from gcloud

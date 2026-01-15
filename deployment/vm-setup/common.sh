@@ -2,35 +2,57 @@
 # common.sh
 # Shared utilities and configuration for VM setup scripts.
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Color codes
+CYAN='\033[0;36m'      # INFO
+GREEN='\033[0;32m'     # SUCCESS
+YELLOW='\033[0;33m'    # WARN
+RED='\033[0;31m'       # ERROR
+PURPLE='\033[0;35m'    # DEBUG
+NC='\033[0m'           # No Color
 
-# -----------------------------------------------------------------------------
+# Internal logging function
+_log() {
+    local level="$1"
+    local color="$2"
+    local message="$3"
+    local timestamp
+    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    local prefix="${timestamp} ${color}[${level}]${NC}"
+
+    # Console Output - Errors go to stderr, everything else to stdout
+    if [[ "${level}" == "ERROR" ]]; then
+        echo -e "${prefix} ${message}" >&2
+    else
+        echo -e "${prefix} ${message}"
+    fi
+
+    # File Output (if LOG_FILE is set)
+    if [[ -n "${LOG_FILE:-}" ]]; then
+        # Strip ANSI color codes for plain text logging
+        echo "${timestamp} [${level}] ${message}" >> "${LOG_FILE}"
+    fi
+}
+
 # Logging Functions
-# -----------------------------------------------------------------------------
 log_info() {
-    echo -e "$(date -u +"%Y-%m-%dT%H:%M:%SZ") [${BLUE}INFO${NC}] $1"
+    _log "INFO" "${CYAN}" "$1"
 }
 
 log_warn() {
-    echo -e "$(date -u +"%Y-%m-%dT%H:%M:%SZ") [${YELLOW}WARN${NC}] $1"
+    _log "WARN" "${YELLOW}" "$1"
 }
 
 log_error() {
-    echo -e "$(date -u +"%Y-%m-%dT%H:%M:%SZ") [${RED}ERROR${NC}] $1" >&2
+    _log "ERROR" "${RED}" "$1"
 }
 
 log_success() {
-    echo -e "$(date -u +"%Y-%m-%dT%H:%M:%SZ") [${GREEN}SUCCESS${NC}] $1"
+    _log "✅ SUCCESS" "${GREEN}" "$1"
 }
 
 log_debug() {
-    if [[ "${DEBUG:-}" == "true" ]]; then
-        echo -e "$(date -u +"%Y-%m-%dT%H:%M:%SZ") [DEBUG] $1"
+    if [[ "${DEBUG:-false}" == "true" ]]; then
+        _log "DEBUG" "${PURPLE}" "$1"
     fi
 }
 

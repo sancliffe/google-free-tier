@@ -14,17 +14,23 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/common.sh" 2>/dev/null || {
     # Fallback logging functions if common.sh is not available
+    CYAN='\033[0;36m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[0;33m'
+    RED='\033[0;31m'
+    NC='\033[0m'
+    
     log_info() {
-        echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [INFO] $*"
+        echo -e "$(date -u +'%Y-%m-%dT%H:%M:%SZ') ${CYAN}[INFO]${NC} $*"
     }
     log_error() {
-        echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [ERROR] $*" >&2
+        echo -e "$(date -u +'%Y-%m-%dT%H:%M:%SZ') ${RED}[ERROR]${NC} $*" >&2
     }
     log_success() {
-        echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [✅ SUCCESS] $*"
+        echo -e "$(date -u +'%Y-%m-%dT%H:%M:%SZ') ${GREEN}[✅ SUCCESS]${NC} $*"
     }
     log_warn() {
-        echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [WARN] $*"
+        echo -e "$(date -u +'%Y-%m-%dT%H:%M:%SZ') ${YELLOW}[WARN]${NC} $*"
     }
 }
 

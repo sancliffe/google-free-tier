@@ -12,8 +12,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "${SCRIPT_DIR}/common.sh" ]]; then
     source "${SCRIPT_DIR}/common.sh"
 else
-    log_info() { echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [INFO] $*"; }
-    log_success() { echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [✅ SUCCESS] $*"; }
+    CYAN='\033[0;36m'
+    GREEN='\033[0;32m'
+    NC='\033[0m'
+    log_info() { echo -e "$(date -u +'%Y-%m-%dT%H:%M:%SZ') ${CYAN}[INFO]${NC} $*"; }
+    log_success() { echo -e "$(date -u +'%Y-%m-%dT%H:%M:%SZ') ${GREEN}[✅ SUCCESS]${NC} $*"; }
 fi
 
 log_info "Checking if VM '$VM_NAME' already exists in project '$PROJECT_ID' zone '$ZONE'..."
