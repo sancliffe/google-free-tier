@@ -112,7 +112,7 @@ fi
 
 # Check Monitoring Notification Channel
 # Assumes EMAIL_ADDRESS is defined in config.sh
-if gcloud monitoring notification-channels list --project="$PROJECT_ID" --format="json" | jq -e ".[] | select(.type == \"email\" and .labels.email_address == \"$EMAIL_ADDRESS\")" &>/dev/null; then
+if gcloud beta monitoring channels list --project="$PROJECT_ID" --format="json" | jq -e ".[] | select(.type == \"email\" and .labels.email_address == \"$EMAIL_ADDRESS\")" &>/dev/null; then
   log_success "Monitoring Notification Channel for '$EMAIL_ADDRESS' exists"
   PASS=$((PASS + 1))
 else

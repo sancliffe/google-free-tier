@@ -90,7 +90,7 @@ load_and_prompt_config() {
             read -rp "Enter ${config_keys[${key}]}: " "config[${key}]"
         else
             config[${key}]="${value_from_env}"
-            log "  ${config_keys[${key}]}: ${config[${key}]}"
+            log_info "  ${config_keys[${key}]}: ${config[${key}]}"
         fi
     done
 
@@ -103,7 +103,7 @@ load_and_prompt_config() {
 
 # Function to verify gcloud authentication
 verify_gcloud_auth() {
-    log "Verifying gcloud authentication..."
+    log_info "Verifying gcloud authentication..."
     
     # Check if any account is authenticated
     if ! gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | grep -q .; then
@@ -132,7 +132,79 @@ verify_gcloud_auth() {
         exit 1
     fi
     
-    log "✓ gcloud authentication verified"
+    log_success "✓ gcloud authentication verified"
+}
+
+# Associative array to track which resources have been successfully created
+declare -A CREATED_STATUS=(
+    [VM]=false
+    [FIREWALL]=false
+    [MONITORING]=false
+    [GCS_BACKUP_BUCKET]=false
+    [GCS_TF_BUCKET]=false
+    [SECRETS]=false
+    [ARTIFACT_REGISTRY]=false
+)
+
+# Function to run a command with retries and error handling
+# Arguments:
+#   $1: The command string to execute
+#   $2: A description of the command for logging
+#   $3: (Optional) Number of retries (default: 5)
+#   $4: (Optional) Delay between retries in seconds (default: 10)
+run_command_with_retry() {
+    local cmd="$1"
+    local description="$2"
+    local retries="${3:-5}"   # Default to 5 retries
+    local delay="${4:-10}"   # Default to 10 seconds delay
+    local attempt=1
+    local success=0
+
+    log_info "Starting: $description"
+
+    while [[ $attempt -le $retries ]]; do
+        log_info "  Attempt $attempt/$retries: Executing '$cmd'"
+        set +e # Temporarily disable 'e' to allow command failure without exiting script
+        eval "$cmd"
+        local exit_code=$?
+        set -e # Re-enable 'e'
+
+        if [[ $exit_code -eq 0 ]]; then
+            log_success "  $description succeeded on attempt $attempt."
+            success=1
+            break
+        else
+        log_warn "  $description failed on attempt $attempt (exit code: $exit_code). Retrying in $delay seconds..."
+
+            sleep "$delay"
+        fi
+        attempt=$((attempt + 1))
+    done
+
+    if [[ $success -eq 0 ]]; then
+        log_error "  $description failed after $retries attempts. Exiting."
+        cleanup_on_failure
+        exit 1 # Ensure the script exits after cleanup
+    fi
+    return 0
+}
+
+# Function to cleanup resources in case of failure
+cleanup_resources() {
+    log_info "Cleaning up resources..."
+    
+    # Execute the cleanup script with necessary parameters
+    "${SCRIPT_DIR}/gcp-cleanup.sh" \
+        --vm-name "${config[VM_NAME]}" \
+        --zone "${config[ZONE]}" \
+        --firewall-rule-name "${config[FIREWALL_RULE_NAME]}" \
+        --repo-name "${config[REPO_NAME]}" \
+        --repo-location "${config[REPO_LOCATION]}" \
+        --project-id "${config[PROJECT_ID]}"
+
+    log_info "Resource cleanup completed."
+
+    exit 1
 }
 
 # --- Main ---
@@ -140,12 +212,12 @@ verify_gcloud_auth() {
 echo ""
 printf '=%.0s' {1..60}; echo
 log "Starting GCP setup..."
-log "⏱️  Estimated time: 2-3 minutes"
+log_info "⏱️  Estimated time: 2-3 minutes"
 printf '=%.0s' {1..60}; echo
 echo ""
 
-# Verify required tools
-for tool in gcloud jq; do
+# Verify required tools (already done in common.sh or fallback)
+for tool in gcloud jq gsutil; do
     if ! command -v "$tool" &> /dev/null; then
         log_error "Required tool '$tool' is not installed."
         exit 1
@@ -158,84 +230,125 @@ verify_gcloud_auth
 START_TIME=$(date +%s)
 load_and_prompt_config
 
-# Ensure scripts are executable
-chmod +x "${SCRIPT_DIR}"/gcp-0[1-6]*.sh
+# Ensure all setup scripts are executable
+chmod +x "${SCRIPT_DIR}"/gcp-0*.sh
 
 log "Checking existing resources..."
 SKIP_COUNT=0
 CREATE_COUNT=0
 
 echo ""
-# Check VM
+# Check VM 
 if gcloud compute instances describe "${config[VM_NAME]}" --zone="${config[ZONE]}" --project="${config[PROJECT_ID]}" &>/dev/null; then
-  log "  ⏭️  VM '${config[VM_NAME]}': Already exists"
+  log_info "  ⏭️  VM '${config[VM_NAME]}': Already exists"
   SKIP_COUNT=$((SKIP_COUNT + 1))
 else
-  log "  ✨ VM '${config[VM_NAME]}': Will create"
+  log_info "  ✨ VM '${config[VM_NAME]}': Will create"
   CREATE_COUNT=$((CREATE_COUNT + 1))
-fi
+fi 
 
-# Check Firewall
+# Check Firewall  
 if gcloud compute firewall-rules describe "${config[FIREWALL_RULE_NAME]}" --project="${config[PROJECT_ID]}" &>/dev/null; then
-  log "  ⏭️  Firewall rule '${config[FIREWALL_RULE_NAME]}': Already exists"
+  log_info "  ⏭️  Firewall rule '${config[FIREWALL_RULE_NAME]}': Already exists"
   SKIP_COUNT=$((SKIP_COUNT + 1))
 else
-  log "  ✨ Firewall rule '${config[FIREWALL_RULE_NAME]}': Will create"
+  log_info "  ✨ Firewall rule '${config[FIREWALL_RULE_NAME]}': Will create"
+  CREATE_COUNT=$((CREATE_COUNT + 1))
+fi 
+
+# Check GCS Backup Bucket (NEW check)
+if gsutil ls "gs://${config[GCS_BUCKET_NAME]}" &>/dev/null; then
+  log_info "  ⏭️  GCS Backup Bucket '${config[GCS_BUCKET_NAME]}': Already exists"
+  SKIP_COUNT=$((SKIP_COUNT + 1))
+else
+  log_info "  ✨ GCS Backup Bucket '${config[GCS_BUCKET_NAME]}': Will create"
   CREATE_COUNT=$((CREATE_COUNT + 1))
 fi
 
-# Check Artifact Registry
-if gcloud artifacts repositories describe "${config[REPO_NAME]}" --location="${config[REPO_LOCATION]}" --project="${config[PROJECT_ID]}" &>/dev/null; then
-  log "  ⏭️  Artifact Registry '${config[REPO_NAME]}': Already exists"
+# Check GCS Terraform State Bucket (NEW check)
+if gsutil ls "gs://${config[TF_STATE_BUCKET]}" &>/dev/null; then
+  log_info "  ⏭️  GCS Terraform State Bucket '${config[TF_STATE_BUCKET]}': Already exists"
   SKIP_COUNT=$((SKIP_COUNT + 1))
 else
-  log "  ✨ Artifact Registry '${config[REPO_NAME]}': Will create"
+  log_info "  ✨ GCS Terraform State Bucket '${config[TF_STATE_BUCKET]}': Will create"
   CREATE_COUNT=$((CREATE_COUNT + 1))
 fi
+
+# Check Artifact Registry  
+if gcloud artifacts repositories describe "${config[REPO_NAME]}" --location="${config[REPO_LOCATION]}" --project="${config[PROJECT_ID]}" &>/dev/null; then
+  log_info "  ⏭️  Artifact Registry '${config[REPO_NAME]}': Already exists"
+  SKIP_COUNT=$((SKIP_COUNT + 1))
+else
+  log_info "  ✨ Artifact Registry '${config[REPO_NAME]}': Will create"
+  CREATE_COUNT=$((CREATE_COUNT + 1))
+fi 
 
 echo ""
 log "📊 Summary: $CREATE_COUNT to create, $SKIP_COUNT to skip"
 echo ""
 read -p "Continue with setup? (y/N): " -n 1 -r
-echo
+echo # Add a newline after the prompt
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-  log "Setup cancelled."
+  log_info "Setup cancelled."
   exit 0
 fi
 
 echo ""
 printf '=%.0s' {1..60}; echo
-log "🚀 Starting setup execution..."
+log_info "🚀 Starting setup execution..."
 printf '=%.0s' {1..60}; echo
 
 # Execute setup scripts in order with correct filenames
-log "Step 1/7: Creating VM..."
-"${SCRIPT_DIR}/gcp-01-create-vm.sh" "${config[VM_NAME]}" "${config[ZONE]}" "${config[PROJECT_ID]}"
+run_command_with_retry \
+    "\"${SCRIPT_DIR}/gcp-01-create-vm.sh\" \"${config[VM_NAME]}\" \"${config[ZONE]}\" \"${config[PROJECT_ID]}\"" \
+    "Step 1/8: Creating VM '${config[VM_NAME]}'"
+CREATED_STATUS[VM]=true
 
-log "Step 2/7: Opening firewall..."
-"${SCRIPT_DIR}/gcp-02-firewall-open.sh" "${config[VM_NAME]}" "${config[ZONE]}" "${config[FIREWALL_RULE_NAME]}" "${config[PROJECT_ID]}" "${config[TAGS]}"
+run_command_with_retry \
+    "\"${SCRIPT_DIR}/gcp-02-firewall-open.sh\" \"${config[VM_NAME]}\" \"${config[ZONE]}\" \"${config[FIREWALL_RULE_NAME]}\" \"${config[PROJECT_ID]}\" \"${config[TAGS]}\"" \
+    "Step 2/8: Opening firewall rule '${config[FIREWALL_RULE_NAME]}'"
+CREATED_STATUS[FIREWALL]=true
 
-log "Step 3/7: Setting up monitoring..."
-"${SCRIPT_DIR}/gcp-03-setup-monitoring.sh" "${config[VM_NAME]}" "${config[ZONE]}" "${config[EMAIL_ADDRESS]}" "${config[DISPLAY_NAME]}" "${config[DOMAIN]}" "${config[PROJECT_ID]}"
+run_command_with_retry \
+    "\"${SCRIPT_DIR}/gcp-03-setup-monitoring.sh\" \"${config[VM_NAME]}\" \"${config[ZONE]}\" \"${config[EMAIL_ADDRESS]}\" \"${config[DISPLAY_NAME]}\" \"${config[DOMAIN]}\" \"${config[PROJECT_ID]}\"" \
+    "Step 3/8: Setting up monitoring"
+CREATED_STATUS[MONITORING]=true
 
-log "Step 4/7: Creating secrets..."
-"${SCRIPT_DIR}/gcp-04-create-secrets.sh" \
-  --project-id "${config[PROJECT_ID]}" \
-  --duckdns-token "${config[DUCKDNS_TOKEN]}" \
-  --email "${config[EMAIL_ADDRESS]}" \
-  --domain "${config[DOMAIN]}" \
-  --bucket "${config[GCS_BUCKET_NAME]}" \
-  --tf-state-bucket "${config[TF_STATE_BUCKET]}" \
-  --backup-dir "${config[BACKUP_DIR]}" \
-  --billing-account "${config[BILLING_ACCOUNT_ID]}"
+# NEW STEP: Create GCS Buckets
+log_info "Step 4/8: Creating GCS buckets..."
+if ! gsutil ls "gs://${config[GCS_BUCKET_NAME]}" &>/dev/null; then
+  run_command_with_retry \
+      "gsutil mb -p \"${config[PROJECT_ID]}\" \"gs://${config[GCS_BUCKET_NAME]}\"" \
+      "Creating GCS Backup Bucket '${config[GCS_BUCKET_NAME]}'"
+  CREATED_STATUS[GCS_BACKUP_BUCKET]=true
+else
+  log_info "  GCS Backup Bucket '${config[GCS_BUCKET_NAME]}' already exists, skipping creation."
+fi
 
-log "Step 5/7: Creating artifact registry..."
-"${SCRIPT_DIR}/gcp-05-create-artifact-registry.sh" "${config[REPO_NAME]}" "${config[REPO_LOCATION]}" "${config[PROJECT_ID]}"
+if ! gsutil ls "gs://${config[TF_STATE_BUCKET]}" &>/dev/null; then
+  run_command_with_retry \
+      "gsutil mb -p \"${config[PROJECT_ID]}\" \"gs://${config[TF_STATE_BUCKET]}\"" \
+      "Creating GCS Terraform State Bucket '${config[TF_STATE_BUCKET]}'"
+  CREATED_STATUS[GCS_TF_BUCKET]=true
+else
+  log_info "  GCS Terraform State Bucket '${config[TF_STATE_BUCKET]}' already exists, skipping creation."
+fi
 
-log "Step 6/7: Validating GCP setup..."
-"${SCRIPT_DIR}/gcp-06-validate.sh"
+run_command_with_retry \
+    "\"${SCRIPT_DIR}/gcp-04-create-secrets.sh\" --project-id \"${config[PROJECT_ID]}\" --duckdns-token \"${config[DUCKDNS_TOKEN]}\" --email \"${config[EMAIL_ADDRESS]}\" --domain \"${config[DOMAIN]}\" --bucket \"${config[GCS_BUCKET_NAME]}\" --tf-state-bucket \"${config[TF_STATE_BUCKET]}\" --backup-dir \"${config[BACKUP_DIR]}\" --billing-account \"${config[BILLING_ACCOUNT_ID]}\"" \
+    "Step 5/8: Creating secrets"
+CREATED_STATUS[SECRETS]=true
 
-log "Step 7/7: Configuring VM environment and SSHing..."
+run_command_with_retry \
+    "\"${SCRIPT_DIR}/gcp-05-create-artifact-registry.sh\" \"${config[REPO_NAME]}\" \"${config[REPO_LOCATION]}\" \"${config[PROJECT_ID]}\"" \
+    "Step 6/8: Creating artifact registry '${config[REPO_NAME]}'"
+CREATED_STATUS[ARTIFACT_REGISTRY]=true
+
+run_command_with_retry \
+    "\"${SCRIPT_DIR}/gcp-06-validate.sh\"" \
+    "Step 7/8: Validating GCP setup"
+
+log_info "Step 8/8: Configuring VM environment and SSHing..."
 
 # Define variables to export to the VM's environment
 # These are variables that the VM itself might need for subsequent operations or scripts.
@@ -262,20 +375,22 @@ done
 ENV_SETUP_COMMAND+="echo 'Environment variables set in ~/.bashrc. Please source ~/.bashrc or re-login for them to take effect in new sessions.'"
 
 # Execute the command on the VM to set environment variables
-log "Setting environment variables on VM '${config[VM_NAME]}' in ~/.bashrc..."
-gcloud compute ssh "${config[VM_NAME]}" --zone="${config[ZONE]}" --project="${config[PROJECT_ID]}" --command "$ENV_SETUP_COMMAND"
+run_command_with_retry \
+    "gcloud compute ssh \"${config[VM_NAME]}\" --zone=\"${config[ZONE]}\" --project=\"${config[PROJECT_ID]}\" --command \"$ENV_SETUP_COMMAND\"" \
+    "Setting environment variables on VM '${config[VM_NAME]}' in ~/.bashrc"
 
 # SSH into the VM
-log "Initiating SSH session to VM '${config[VM_NAME]}'..."
+log_info "Initiating SSH session to VM '${config[VM_NAME]}'..."
+# This is an interactive command, so we don't wrap it in run_command_with_retry
+# as it's the final interactive step.
 gcloud compute ssh "${config[VM_NAME]}" --zone="${config[ZONE]}" --project="${config[PROJECT_ID]}"
 
 echo ""
 printf '=%.0s' {1..60}; echo
-log "✅ GCP setup completed successfully!"
+log_success "✅ GCP setup completed successfully!"
 printf '=%.0s' {1..60}; echo
 
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
-echo ""
-log "⏱️  Total setup time: $((DURATION / 60))m $((DURATION % 60))s"
+log_info "⏱️  Total setup time: $((DURATION / 60))m $((DURATION % 60))s"
 echo ""

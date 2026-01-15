@@ -15,6 +15,16 @@ FIREWALL_RULE_NAME="allow-http-https"
 REPO_NAME="gke-apps"
 REPO_LOCATION="us-central1"
 PROJECT_ID=""
+GCS_BUCKET_NAME="" # Added for GCS cleanup
+TF_STATE_BUCKET="" # Added for GCS cleanup
+
+# Flags to control selective deletion
+DELETE_VM=false
+DELETE_FIREWALL=false
+DELETE_MONITORING=false
+DELETE_SECRETS=false
+DELETE_ARTIFACT_REGISTRY=false
+DELETE_GCS_BUCKETS=false # This flag will control both backup and tf state buckets
 
 # Source config file if it exists
 if [[ -f "${CONFIG_FILE}" ]]; then
@@ -97,19 +107,23 @@ echo "------------------------------------------------------------"
 
 
 # 1. Delete VM Instance (from 1-create-vm.sh)
-log_info "Step 1: Deleting VM instance: ${VM_NAME}..."
-if ! gcloud compute instances delete "${VM_NAME}" --zone="${ZONE}" --project="${PROJECT_ID}" --quiet; then
-    log_warn "VM ${VM_NAME} not found or already deleted."
+if [[ "${DELETE_VM}" == "true" ]]; then
+    log_info "Step 1: Deleting VM instance: ${VM_NAME}..."
+    if ! gcloud compute instances delete "${VM_NAME}" --zone="${ZONE}" --project="${PROJECT_ID}" --quiet; then
+        log_warn "VM ${VM_NAME} not found or already deleted."
+    fi
 fi
 
 # 2. Delete Firewall Rules (from 2-open-firewall.sh)
-log_info "Step 2: Deleting firewall rule: ${FIREWALL_RULE_NAME}..."
-if ! gcloud compute firewall-rules delete "${FIREWALL_RULE_NAME}" --project="${PROJECT_ID}" --quiet; then
-    log_warn "Firewall rule ${FIREWALL_RULE_NAME} not found or already deleted."
+if [[ "${DELETE_FIREWALL}" == "true" ]]; then
+    log_info "Step 2: Deleting firewall rule: ${FIREWALL_RULE_NAME}..."
+    if ! gcloud compute firewall-rules delete "${FIREWALL_RULE_NAME}" --project="${PROJECT_ID}" --quiet; then
+        log_warn "Firewall rule ${FIREWALL_RULE_NAME} not found or already deleted."
+    fi
 fi
 
 # 3. Delete Monitoring Resources (from 3-setup-monitoring.sh)
-log_info "Step 3: Deleting Uptime Checks and Alert Policies..."
+if [[ "${DELETE_MONITORING}" == "true" ]]; then
 
 # Note: This is not perfectly reliable if you have multiple checks with similar names.
 # A more robust solution would store created resource IDs.
