@@ -227,7 +227,7 @@ log_info "=== Uploading setup scripts to VM ==="
 
 # Use scp to copy files
 # Note: --recurse is for gcloud compute scp
-run_command gcloud compute scp --recurse "${SCRIPT_DIR}" "${VM_NAME}:~/vm-setup" --zone="${ZONE}" "Uploading setup scripts to VM"
+run_command gcloud compute scp --recurse "${SCRIPT_DIR}" "${VM_NAME}:/tmp/vm-setup" --zone="${ZONE}" "Uploading setup scripts to VM"
 
 log_info "=== Executing Host Setup Scripts on VM ==="
 
@@ -312,7 +312,7 @@ log_info "Generating remote runner script..."
 cat > runner.sh <<EOF
 #!/bin/bash
 set -e
-cd ~/vm-setup
+cd /tmp/vm-setup
 
 # Export sensitive variables passed from local machine
 export DUCKDNS_TOKEN="${DUCKDNS_TOKEN}"
@@ -332,12 +332,12 @@ for script in "${HOST_SCRIPTS[@]}"; do
 done
 
 # Upload the runner
-run_command gcloud compute scp runner.sh "${VM_NAME}:~/vm-setup/runner.sh" --zone="${ZONE}" "Uploading runner script"
+run_command gcloud compute scp runner.sh "${VM_NAME}:/tmp/vm-setup/runner.sh" --zone="${ZONE}" "Uploading runner script"
 rm -f runner.sh
 
 # Execute the runner
 log_info "Executing runner script on VM..."
-run_command gcloud compute ssh "${VM_NAME}" --zone="${ZONE}" --command="chmod +x ~/vm-setup/runner.sh && sudo ~/vm-setup/runner.sh" "Running host setup scripts"
+run_command gcloud compute ssh "${VM_NAME}" --zone="${ZONE}" --command="chmod +x /tmp/vm-setup/runner.sh && sudo /tmp/vm-setup/runner.sh" "Running host setup scripts"
 
 # 7. Validation
 log_info "=== Step 7: Final Validation ==="
