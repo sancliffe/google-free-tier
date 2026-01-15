@@ -13,7 +13,11 @@ print_newline
 check_root
 
 # 1. Fetch SSH allowed IPs (optional)
-SSH_SOURCE_IPS=$(fetch_secret "ssh_allowed_ips" "SSH_ALLOWED_IPS" || true) # Use || true to prevent script exit if secret not found
+SSH_SOURCE_IPS=$(fetch_secret "ssh_allowed_ips" "SSH_ALLOWED_IPS")
+if [[ -z "$SSH_SOURCE_IPS" ]]; then
+    log_error "Failed to retrieve 'ssh_allowed_ips'. SSH access cannot be restricted. Exiting for security."
+    exit 1
+fi
 
 # 2. Install UFW
 if ! command -v ufw &> /dev/null; then
@@ -33,13 +37,8 @@ ufw default allow outgoing
 
 # 5. Allow Critical Ports
 log_info "Allowing SSH (Port 22)..."
-if [[ -n "$SSH_SOURCE_IPS" ]]; then
-    log_info "Restricting SSH access to: $SSH_SOURCE_IPS"
-    ufw allow from "$SSH_SOURCE_IPS" to any port 22/tcp
-else
-    log_warn "SSH access is allowed from ANYWHERE. Consider restricting access for better security."
-    ufw allow 22/tcp
-fi
+log_info "Restricting SSH access to: $SSH_SOURCE_IPS"
+ufw allow from "$SSH_SOURCE_IPS" to any port 22/tcp
 log_info "Rule added: Allow SSH"
 
 # Add SSH rate limiting

@@ -29,21 +29,12 @@ main() {
 
     # FIXED: Check if Nginx metrics endpoint is actually available
     log_info "Checking Nginx metrics availability..."
-    local nginx_config=""
-    
+    local enable_nginx_metrics=false
     if curl -s -f http://127.0.0.1/stub_status > /dev/null; then
         log_success "Nginx stub_status detected. Configuring metrics."
-        nginx_config=$(cat <<EOF
-    nginx:
-      type: nginx
-      stub_status_url: http://127.0.0.1/stub_status
-EOF
-)
-        nginx_pipeline="      nginx:\n        receivers: [nginx]"
+        enable_nginx_metrics=true
     else
         log_warn "Nginx stub_status NOT detected. Skipping Nginx metrics configuration."
-        nginx_config=""
-        nginx_pipeline=""
     fi
 
     log_info "Configuring agent..."

@@ -209,16 +209,16 @@ log "🚀 Starting setup execution..."
 printf '=%.0s' {1..60}; echo
 
 # Execute setup scripts in order with correct filenames
-log "Step 1/5: Creating VM..."
+log "Step 1/7: Creating VM..."
 "${SCRIPT_DIR}/gcp-01-create-vm.sh" "${config[VM_NAME]}" "${config[ZONE]}" "${config[PROJECT_ID]}"
 
-log "Step 2/5: Opening firewall..."
+log "Step 2/7: Opening firewall..."
 "${SCRIPT_DIR}/gcp-02-firewall-open.sh" "${config[VM_NAME]}" "${config[ZONE]}" "${config[FIREWALL_RULE_NAME]}" "${config[PROJECT_ID]}" "${config[TAGS]}"
 
-log "Step 3/5: Setting up monitoring..."
+log "Step 3/7: Setting up monitoring..."
 "${SCRIPT_DIR}/gcp-03-setup-monitoring.sh" "${config[VM_NAME]}" "${config[ZONE]}" "${config[EMAIL_ADDRESS]}" "${config[DISPLAY_NAME]}" "${config[DOMAIN]}" "${config[PROJECT_ID]}"
 
-log "Step 4/5: Creating secrets..."
+log "Step 4/7: Creating secrets..."
 "${SCRIPT_DIR}/gcp-04-create-secrets.sh" \
   --project-id "${config[PROJECT_ID]}" \
   --duckdns-token "${config[DUCKDNS_TOKEN]}" \
@@ -229,8 +229,45 @@ log "Step 4/5: Creating secrets..."
   --backup-dir "${config[BACKUP_DIR]}" \
   --billing-account "${config[BILLING_ACCOUNT_ID]}"
 
-log "Step 5/5: Creating artifact registry..."
+log "Step 5/7: Creating artifact registry..."
 "${SCRIPT_DIR}/gcp-05-create-artifact-registry.sh" "${config[REPO_NAME]}" "${config[REPO_LOCATION]}" "${config[PROJECT_ID]}"
+
+log "Step 6/7: Validating GCP setup..."
+"${SCRIPT_DIR}/gcp-06-validate.sh"
+
+log "Step 7/7: Configuring VM environment and SSHing..."
+
+# Define variables to export to the VM's environment
+# These are variables that the VM itself might need for subsequent operations or scripts.
+declare -a VM_ENV_VARS=(
+  "PROJECT_ID=${config[PROJECT_ID]}"
+  "ZONE=${config[ZONE]}"
+  "VM_NAME=${config[VM_NAME]}"
+  "EMAIL_ADDRESS=${config[EMAIL_ADDRESS]}"
+  "DOMAIN=${config[DOMAIN]}"
+  "DUCKDNS_TOKEN=${config[DUCKDNS_TOKEN]}" # Note: Storing sensitive info in .bashrc might not be ideal for production. Consider Secret Manager access on VM.
+  "GCS_BUCKET_NAME=${config[GCS_BUCKET_NAME]}"
+  "BACKUP_DIR=${config[BACKUP_DIR]}"
+)
+
+# Construct the command to set environment variables persistently on the VM
+ENV_SETUP_COMMAND=""
+for var_entry in "${VM_ENV_VARS[@]}"; do
+  KEY="${var_entry%%=*}"
+  VALUE="${var_entry#*=}"
+  # Escape double quotes in the value to ensure it's correctly interpreted by bash on the VM
+  ESCAPED_VALUE=$(printf %s "$VALUE" | sed 's/"/\\"/g')
+  ENV_SETUP_COMMAND+="echo 'export $KEY=\"$ESCAPED_VALUE\"' >> ~/.bashrc;"
+done
+ENV_SETUP_COMMAND+="echo 'Environment variables set in ~/.bashrc. Please source ~/.bashrc or re-login for them to take effect in new sessions.'"
+
+# Execute the command on the VM to set environment variables
+log "Setting environment variables on VM '${config[VM_NAME]}' in ~/.bashrc..."
+gcloud compute ssh "${config[VM_NAME]}" --zone="${config[ZONE]}" --project="${config[PROJECT_ID]}" --command "$ENV_SETUP_COMMAND"
+
+# SSH into the VM
+log "Initiating SSH session to VM '${config[VM_NAME]}'..."
+gcloud compute ssh "${config[VM_NAME]}" --zone="${config[ZONE]}" --project="${config[PROJECT_ID]}"
 
 echo ""
 printf '=%.0s' {1..60}; echo

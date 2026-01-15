@@ -4,8 +4,6 @@
 # It runs on the VM instance to configure software and settings.
 # It runs each setup script in sequence.
 
-set_strict_mode
-
 # --- Preamble ---
 
 # Absolute path to the directory where this script is located.
@@ -34,6 +32,11 @@ source "${SCRIPT_DIR}/common.sh" 2>/dev/null || {
         echo -e "$(date -u +'%Y-%m-%dT%H:%M:%SZ') ${YELLOW}[WARN]${NC} $*"
     }
 }
+
+set_strict_mode
+
+# Source common logging functions
+# shellcheck disable=SC1091
 
 # Legacy function for backward compatibility
 log() {
@@ -77,8 +80,8 @@ done
 
 print_newline
 print_banner
-log "Starting Host setup..."
-log "⏱️  Estimated time: 5-10 minutes"
+log_info "Starting Host setup..."
+log_info "⏱️  Estimated time: 5-10 minutes"
 print_banner
 print_newline
 
@@ -106,10 +109,10 @@ RUN_NGINX=true
 print_newline
 # Check Swap (Phase 1)
 if grep -q "/swapfile" /etc/fstab; then
-  log "  ⏭️  Swap file: Already configured"
+  log_info "  ⏭️  Swap file: Already configured"
   RUN_SWAP=false
 else
-  log "  ✨ Swap file: Will configure"
+  log_info "  ✨ Swap file: Will configure"
 fi
 
 # Apply skip flags
@@ -143,16 +146,16 @@ if [ -t 0 ] && ! "$NON_INTERACTIVE"; then
     read -p "Continue with setup? (y/N): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-      log "Setup cancelled."
+      log_info "Setup cancelled."
       exit 0
     fi
 else
-    log "Non-interactive mode detected. Proceeding..."
+    log_info "Non-interactive mode detected. Proceeding..."
 fi
 
 print_newline
 print_banner
-log "🚀 Starting setup execution..."
+log_info "🚀 Starting setup execution..."
 print_banner
 
 # Execute setup scripts based on flags
@@ -178,11 +181,8 @@ fi
 
 print_newline
 print_banner
-log "✅ Host setup completed successfully!"
+log_info "✅ Host setup completed successfully!"
 print_banner
 
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
-echo ""
-log "⏱️  Total setup time: $((DURATION / 60))m $((DURATION % 60))s"
-echo ""

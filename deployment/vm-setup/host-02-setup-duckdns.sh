@@ -35,8 +35,8 @@ LOG_PATH="/var/log/duckdns.log"
 
 cat > "$SCRIPT_PATH" <<EOF
 #!/bin/bash
-# Update DuckDNS
-curl -k "https://www.duckdns.org/update?domains=$DUCKDNS_DOMAIN&token=$DUCKDNS_TOKEN&ip=" -o "$LOG_PATH"
+# Update DuckDNS (removed -k for security, ensure system CA certs are up-to-date)
+curl "https://www.duckdns.org/update?domains=$DUCKDNS_DOMAIN&token=$DUCKDNS_TOKEN&ip=" -o "$LOG_PATH"
 EOF
 
 chmod +x "$SCRIPT_PATH"

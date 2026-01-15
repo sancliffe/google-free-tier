@@ -85,6 +85,12 @@ chmod 644 "$CRON_FILE"
 
 log_success "Daily backup cron job scheduled at 3:00 AM."
 
+# 4. Save bucket name for other scripts (e.g., test-backup-restore.sh)
+CONFIG_FILE="/etc/default/backup-config"
+echo "BACKUP_BUCKET=\"$BUCKET_NAME\"" | sudo tee "$CONFIG_FILE" > /dev/null
+chmod 644 "$CONFIG_FILE"
+log_success "Backup bucket name saved to $CONFIG_FILE."
+
 # 4. Verify access
 log_info "Verifying write access to bucket..."
 TEST_FILE="/tmp/test-access.txt"

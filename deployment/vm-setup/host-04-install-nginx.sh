@@ -33,10 +33,11 @@ sed -i 's/gzip on;/gzip off;/g' "$NGINX_CONF"
 log_info "Disabled default gzip settings in main nginx.conf to save CPU"
 
 # Create a custom config for timeout and buffer adjustments
-OPTIM_CONF="/etc/nginx/conf.d/e2-micro-optimizations.conf" # This file is created if it doesn't exist.
-# Only backup if the file already exists.
+OPTIM_CONF="/etc/nginx/conf.d/e2-micro-optimizations.conf"
+# Backup existing optimization config if it exists before overwriting
 if [ -f "$OPTIM_CONF" ]; then
-backup_file "$OPTIM_CONF"
+    backup_file "$OPTIM_CONF"
+fi
 
 cat > "$OPTIM_CONF" <<EOF
 # Optimizations for low-resource environments (e2-micro)
@@ -51,7 +52,6 @@ client_header_timeout 12;
 keepalive_timeout 15;
 send_timeout 10;
 EOF
-fi
 
 log_success "Nginx optimization config created at $OPTIM_CONF."
 
