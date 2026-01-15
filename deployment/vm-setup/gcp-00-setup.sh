@@ -1,387 +1,338 @@
 #!/bin/bash
-#
-# This script orchestrates the entire GCP setup process.
-# It sources the configuration and then runs each setup script in sequence.
+# ==============================================================================
+# Script: gcp-00-setup.sh
+# Description: Orchestrates the setup of the GCP environment.
+#              1. Configures GCP project and region.
+#              2. Enables required APIs.
+#              3. Reserves a static IP.
+#              4. Creates a Service Account.
+#              5. Creates a GCS bucket for backups.
+#              6. Calls gcp-01-create-vm.sh to create the VM.
+#              7. Calls gcp-02-firewall-open.sh to configure firewall rules.
+#              8. Calls gcp-03-setup-monitoring.sh to setup monitoring (optional).
+#              9. Calls gcp-04-create-secrets.sh to create secrets (optional).
+#             10. Calls gcp-05-create-artifact-registry.sh to create AR (optional).
+#             11. Calls gcp-06-validate.sh to validate the setup.
+# Usage: ./gcp-00-setup.sh
+# Dependencies: gcloud, common.sh, config.sh
+# ==============================================================================
 
-set -eo pipefail
+set -euo pipefail
 
-# --- Preamble ---
-
-# Absolute path to the directory where this script is located.
+# --- Import Common Functions and Config ---
+# Get the directory of the current script
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/common.sh"
+source "${SCRIPT_DIR}/config.sh"
 
-# Source common logging functions
-# shellcheck disable=SC1091
-source "${SCRIPT_DIR}/common.sh" 2>/dev/null || {
-    # Fallback logging functions if common.sh is not available
-    CYAN='\033[0;36m'
-    GREEN='\033[0;32m'
-    YELLOW='\033[0;33m'
-    RED='\033[0;31m'
-    NC='\033[0m'
-    
-    log_info() {
-        echo -e "$(date -u +'%Y-%m-%dT%H:%M:%SZ') ${CYAN}[INFO]${NC} $*"
-    }
-    log_error() {
-        echo -e "$(date -u +'%Y-%m-%dT%H:%M:%SZ') ${RED}[ERROR]${NC} $*" >&2
-    }
-    log_success() {
-        echo -e "$(date -u +'%Y-%m-%dT%H:%M:%SZ') ${GREEN}[✅ SUCCESS]${NC} $*"
-    }
-    log_warn() {
-        echo -e "$(date -u +'%Y-%m-%dT%H:%M:%SZ') ${YELLOW}[WARN]${NC} $*"
-    }
-}
+# --- Main Execution ---
 
-# Legacy function for backward compatibility
-log() {
-    log_info "$@"
-}
+log "Starting GCP environment setup..."
 
-declare -A config
-
-# Function to load config from config.sh and prompt for missing values
-load_and_prompt_config() {
-    local config_file="${SCRIPT_DIR}/config.sh"
-    local config_example_file="${SCRIPT_DIR}/config.sh.example"
-
-    if [[ -f "${config_file}" ]]; then
-        log "Sourcing configuration from ${config_file}..."
-        # shellcheck source=/dev/null
-        source "${config_file}"
-    else
-        log "WARNING: Configuration file config.sh not found."
-        log "Using default values from config.sh.example and prompting for input."
-        # shellcheck source=/dev/null
-        source "${config_example_file}"
-    fi
-
-    local -A config_keys=(
-        [PROJECT_ID]="Your GCP project ID"
-        [ZONE]="The GCP zone to deploy resources in (e.g., us-west1-a)"
-        [VM_NAME]="The name of the VM to create"
-        [FIREWALL_RULE_NAME]="The name of the firewall rule to create"
-        [TAGS]="The network tags to apply to the VM (e.g., http-server,https-server)"
-        [REPO_NAME]="The name of the Artifact Registry repository to create"
-        [REPO_LOCATION]="The location of the Artifact Registry repository (e.g., us-central1)"
-        [EMAIL_ADDRESS]="The email address for monitoring notifications"
-        [DISPLAY_NAME]="The display name for the notification channel (e.g., Admin)"
-        [DOMAIN]="The domain name to monitor (e.g., your-domain.com)"
-        [DUCKDNS_TOKEN]="Your DuckDNS token (if using DuckDNS)"
-        [GCS_BUCKET_NAME]="The name of the GCS bucket for backups"
-        [TF_STATE_BUCKET]="The name of the GCS bucket for Terraform state"
-        [BACKUP_DIR]="The absolute path of the directory to back up (e.g., /var/www/html)"
-        [BILLING_ACCOUNT_ID]="Your GCP billing account ID"
-    )
-
-    log "Checking configuration values..."
-    for key in "${!config_keys[@]}"; do
-        local value_from_env="${!key}"
-        if [[ -z "${value_from_env}" ]]; then
-            if [[ "$key" == "PROJECT_ID" ]]; then
-                value_from_env=$(gcloud config get-value project 2>/dev/null || echo "")
-            elif [[ "$key" == "BILLING_ACCOUNT_ID" ]]; then
-                value_from_env=$(gcloud billing accounts list --format='value(accountId)' --limit=1 2>/dev/null || echo "")
-            fi
-        fi
-
-        if [[ -z "${value_from_env}" ]]; then
-            read -rp "Enter ${config_keys[${key}]}: " "config[${key}]"
-        else
-            config[${key}]="${value_from_env}"
-            log_info "  ${config_keys[${key}]}: ${config[${key}]}"
-        fi
-    done
-
-    # Final check for critical values
-    if [[ -z "${config[PROJECT_ID]}" || -z "${config[ZONE]}" || -z "${config[EMAIL_ADDRESS]}" || -z "${config[DOMAIN]}" ]]; then
-        log_error "Critical configuration values (PROJECT_ID, ZONE, EMAIL_ADDRESS, DOMAIN) are missing."
-        exit 1
-    fi
-}
-
-# Function to verify gcloud authentication
-verify_gcloud_auth() {
-    log_info "Verifying gcloud authentication..."
-    
-    # Check if any account is authenticated
-    if ! gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | grep -q .; then
-        log_error "No active gcloud account found."
-        log_error ""
-        log_error "Please authenticate with gcloud:"
-        log_error "  $ gcloud auth login"
-        log_error ""
-        log_error "Or if you have multiple accounts, set the active one:"
-        log_error "  $ gcloud config set account YOUR_EMAIL@example.com"
-        log_error ""
-        log_error "Available accounts:"
-        gcloud auth list 2>/dev/null || echo "  (none configured)"
-        exit 1
-    fi
-    
-    # Verify project is set
-    if ! gcloud config get-value project &>/dev/null; then
-        log_error "No GCP project is configured."
-        log_error ""
-        log_error "Please set your project:"
-        log_error "  $ gcloud config set project PROJECT_ID"
-        log_error ""
-        log_error "Or list available projects:"
-        log_error "  $ gcloud projects list"
-        exit 1
-    fi
-    
-    log_success "✓ gcloud authentication verified"
-}
-
-
-
-# Function to run a command with retries and error handling
-# Arguments:
-#   : The command string to execute
-#   $2: A description of the command for logging
-#   $3: (Optional) Number of retries (default: 5)
-#   $4: (Optional) Delay between retries in seconds (default: 10)
-run_command_with_retry() {
-    local cmd=""
-    local description="$2"
-    local retries="${3:-5}"   # Default to 5 retries
-    local delay="${4:-10}"   # Default to 10 seconds delay
-    local attempt=1
-    local success=0
-
-    log_info "Starting: $description"
-
-    while [[ $attempt -le $retries ]]; do
-        log_info "  Attempt $attempt/$retries: Executing '$cmd'"
-        set +e # Temporarily disable 'e' to allow command failure without exiting script
-        eval "$cmd"
-        local exit_code=$?
-        set -e # Re-enable 'e'
-
-        if [[ $exit_code -eq 0 ]]; then
-            log_success "  $description succeeded on attempt $attempt."
-            success=1
-            break
-        else
-        log_warn "  $description failed on attempt $attempt (exit code: $exit_code). Retrying in $delay seconds..."
-
-            sleep "$delay"
-        fi
-        attempt=$((attempt + 1))
-    done
-
-    if [[ $success -eq 0 ]]; then
-        log_error "  $description failed after $retries attempts. Exiting."
-        cleanup_resources
-        # The script exits within the cleanup_resources function.
-    fi
-    return 0
-}
-
-# Function to cleanup resources in case of failure
-cleanup_resources() {
-    log_info "Cleaning up resources..."
-    
-    # Execute the cleanup script with necessary parameters
-    "${SCRIPT_DIR}/gcp-cleanup.sh" \
-        --vm-name "${config[VM_NAME]}" \
-        --zone "${config[ZONE]}" \
-        --firewall-rule-name "${config[FIREWALL_RULE_NAME]}" \
-        --repo-name "${config[REPO_NAME]}" \
-        --repo-location "${config[REPO_LOCATION]}" \
-        --project-id "${config[PROJECT_ID]}"
-
-    log_info "Resource cleanup completed."
-
-    exit 1
-}
-
-# --- Main ---
-
-echo ""
-printf '=%.0s' {1..60}; echo
-log "Starting GCP setup..."
-log_info "⏱️  Estimated time: 2-3 minutes"
-printf '=%.0s' {1..60}; echo
-echo ""
-
-# Verify required tools (already done in common.sh or fallback)
-for tool in gcloud jq gsutil; do
-    if ! command -v "$tool" &>/dev/null; then
-        log_error "Required tool '$tool' is not installed."
-        exit 1
-    fi
-done
-
-# Verify gcloud authentication before proceeding
-verify_gcloud_auth
-
-START_TIME=$(date +%s)
-load_and_prompt_config
-
-# Convert GCS bucket names to lowercase to prevent errors
-log_info "Converting GCS bucket names to lowercase to ensure compliance..."
-config[GCS_BUCKET_NAME]=$(echo "${config[GCS_BUCKET_NAME]}" | tr '[:upper:]' '[:lower:]')
-config[TF_STATE_BUCKET]=$(echo "${config[TF_STATE_BUCKET]}" | tr '[:upper:]' '[:lower:]')
-log_info "  New GCS_BUCKET_NAME: ${config[GCS_BUCKET_NAME]}"
-log_info "  New TF_STATE_BUCKET: ${config[TF_STATE_BUCKET]}"
-
-# Ensure all setup scripts are executable
-chmod +x "${SCRIPT_DIR}"/gcp-0*.sh
-
-log "Checking existing resources..."
-SKIP_COUNT=0
-CREATE_COUNT=0
-
-echo ""
-# Check VM 
-if gcloud compute instances describe "${config[VM_NAME]}" --zone="${config[ZONE]}" --project="${config[PROJECT_ID]}" &>/dev/null; then
-  log_info "  ⏭️  VM '${config[VM_NAME]}': Already exists"
-  SKIP_COUNT=$((SKIP_COUNT + 1))
-else
-  log_info "  ✨ VM '${config[VM_NAME]}': Will create"
-  CREATE_COUNT=$((CREATE_COUNT + 1))
-fi 
-
-# Check Firewall  
-if gcloud compute firewall-rules describe "${config[FIREWALL_RULE_NAME]}" --project="${config[PROJECT_ID]}" &>/dev/null; then
-  log_info "  ⏭️  Firewall rule '${config[FIREWALL_RULE_NAME]}': Already exists"
-  SKIP_COUNT=$((SKIP_COUNT + 1))
-else
-  log_info "  ✨ Firewall rule '${config[FIREWALL_RULE_NAME]}': Will create"
-  CREATE_COUNT=$((CREATE_COUNT + 1))
-fi 
-
-# Check GCS Backup Bucket (NEW check)
-if gsutil ls "gs://${config[GCS_BUCKET_NAME]}" &>/dev/null; then
-  log_info "  ⏭️  GCS Backup Bucket '${config[GCS_BUCKET_NAME]}': Already exists"
-  SKIP_COUNT=$((SKIP_COUNT + 1))
-else
-  log_info "  ✨ GCS Backup Bucket '${config[GCS_BUCKET_NAME]}': Will create"
-  CREATE_COUNT=$((CREATE_COUNT + 1))
+# 1. Configuration (Project, Region, Zone)
+log "Configuring GCP project settings..."
+if [[ -z "${config[PROJECT_ID]}" ]]; then
+  error_exit "PROJECT_ID is not set in config.sh"
 fi
 
-# Check GCS Terraform State Bucket (NEW check)
-if gsutil ls "gs://${config[TF_STATE_BUCKET]}" &>/dev/null; then
-  log_info "  ⏭️  GCS Terraform State Bucket '${config[TF_STATE_BUCKET]}': Already exists"
-  SKIP_COUNT=$((SKIP_COUNT + 1))
-else
-  log_info "  ✨ GCS Terraform State Bucket '${config[TF_STATE_BUCKET]}': Will create"
-  CREATE_COUNT=$((CREATE_COUNT + 1))
+# Set project
+run_command gcloud config set project "${config[PROJECT_ID]}" "Setting GCP project to ${config[PROJECT_ID]}"
+
+# Set compute region and zone (if provided, though region is usually sufficient for some resources)
+if [[ -n "${config[REGION]}" ]]; then
+  run_command gcloud config set compute/region "${config[REGION]}" "Setting compute region to ${config[REGION]}"
+fi
+if [[ -n "${config[ZONE]}" ]]; then
+  run_command gcloud config set compute/zone "${config[ZONE]}" "Setting compute zone to ${config[ZONE]}"
 fi
 
-# Check Artifact Registry  
-if gcloud artifacts repositories describe "${config[REPO_NAME]}" --location="${config[REPO_LOCATION]}" --project="${config[PROJECT_ID]}" &>/dev/null; then
-  log_info "  ⏭️  Artifact Registry '${config[REPO_NAME]}': Already exists"
-  SKIP_COUNT=$((SKIP_COUNT + 1))
-else
-  log_info "  ✨ Artifact Registry '${config[REPO_NAME]}': Will create"
-  CREATE_COUNT=$((CREATE_COUNT + 1))
-fi 
-
-echo ""
-log "📊 Summary: $CREATE_COUNT to create, $SKIP_COUNT to skip"
-echo ""
-read -p "Continue with setup? (y/N): " -n 1 -r
-echo # Add a newline after the prompt
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-  log_info "Setup cancelled."
-  exit 0
-fi
-
-echo ""
-printf '=%.0s' {1..60}; echo
-log_info "🚀 Starting setup execution..."
-printf '=%.0s' {1..60}; echo
-
-# Execute setup scripts in order with correct filenames
-run_command_with_retry \
-    "\"${SCRIPT_DIR}/gcp-01-create-vm.sh\" \"${config[VM_NAME]}\" \"${config[ZONE]}\" \"${config[PROJECT_ID]}\"" \
-    "Step 1/8: Creating VM '${config[VM_NAME]}'"
-
-run_command_with_retry \
-    "\"${SCRIPT_DIR}/gcp-02-firewall-open.sh\" \"${config[VM_NAME]}\" \"${config[ZONE]}\" \"${config[FIREWALL_RULE_NAME]}\" \"${config[PROJECT_ID]}\" \"${config[TAGS]}\"" \
-    "Step 2/8: Opening firewall rule '${config[FIREWALL_RULE_NAME]}'"
-
-run_command_with_retry \
-    "\"${SCRIPT_DIR}/gcp-03-setup-monitoring.sh\" \"${config[VM_NAME]}\" \"${config[ZONE]}\" \"${config[EMAIL_ADDRESS]}\" \"${config[DISPLAY_NAME]}\" \"${config[DOMAIN]}\" \"${config[PROJECT_ID]}\"" \
-    "Step 3/8: Setting up monitoring"
-
-# NEW STEP: Create GCS Buckets
-log_info "Step 4/8: Creating GCS buckets..."
-if ! gsutil ls "gs://${config[GCS_BUCKET_NAME]}" &>/dev/null; then
-  run_command_with_retry \
-      "gsutil mb -p \"${config[PROJECT_ID]}\" \"gs://${config[GCS_BUCKET_NAME]}\"" \
-      "Creating GCS Backup Bucket '${config[GCS_BUCKET_NAME]}'"
-else
-  log_info "  GCS Backup Bucket '${config[GCS_BUCKET_NAME]}' already exists, skipping creation."
-fi
-
-if ! gsutil ls "gs://${config[TF_STATE_BUCKET]}" &>/dev/null; then
-  run_command_with_retry \
-      "gsutil mb -p \"${config[PROJECT_ID]}\" \"gs://${config[TF_STATE_BUCKET]}\"" \
-      "Creating GCS Terraform State Bucket '${config[TF_STATE_BUCKET]}'"
-else
-  log_info "  GCS Terraform State Bucket '${config[TF_STATE_BUCKET]}' already exists, skipping creation."
-fi
-
-run_command_with_retry \
-    "\"${SCRIPT_DIR}/gcp-04-create-secrets.sh\" --project-id \"${config[PROJECT_ID]}\" --duckdns-token \"${config[DUCKDNS_TOKEN]}\" --email \"${config[EMAIL_ADDRESS]}\" --domain \"${config[DOMAIN]}\" --bucket \"${config[GCS_BUCKET_NAME]}\" --tf-state-bucket \"${config[TF_STATE_BUCKET]}\" --backup-dir \"${config[BACKUP_DIR]}\" --billing-account \"${config[BILLING_ACCOUNT_ID]}\"" \
-    "Step 5/8: Creating secrets"
-
-run_command_with_retry \
-    "\"${SCRIPT_DIR}/gcp-05-create-artifact-registry.sh\" \"${config[REPO_NAME]}\" \"${config[REPO_LOCATION]}\" \"${config[PROJECT_ID]}\"" \
-    "Step 6/8: Creating artifact registry '${config[REPO_NAME]}'""
-
-run_command_with_retry \
-    "\"${SCRIPT_DIR}/gcp-06-validate.sh\"" \
-    "Step 7/8: Validating GCP setup"
-
-log_info "Step 8/8: Configuring VM environment and SSHing..."
-
-# Define variables to export to the VM's environment
-# These are variables that the VM itself might need for subsequent operations or scripts.
-declare -a VM_ENV_VARS=(
-  "PROJECT_ID=${config[PROJECT_ID]}"
-  "ZONE=${config[ZONE]}"
-  "VM_NAME=${config[VM_NAME]}"
-  "EMAIL_ADDRESS=${config[EMAIL_ADDRESS]}"
-  "DOMAIN=${config[DOMAIN]}"
-  "DUCKDNS_TOKEN=${config[DUCKDNS_TOKEN]}" # Note: Storing sensitive info in .bashrc might not be ideal for production. Consider Secret Manager access on VM.
-  "GCS_BUCKET_NAME=${config[GCS_BUCKET_NAME]}"
-  "BACKUP_DIR=${config[BACKUP_DIR]}"
+# 2. Enable Required APIs
+log "Enabling required GCP APIs..."
+REQUIRED_APIS=(
+  "compute.googleapis.com"
+  "logging.googleapis.com"
+  "monitoring.googleapis.com"
+  "storage-component.googleapis.com" # For GCS
+  "storage-api.googleapis.com"
+  "secretmanager.googleapis.com" # If using Secret Manager
+  "artifactregistry.googleapis.com" # If using Artifact Registry
 )
 
-# Construct the command to set environment variables persistently on the VM
+# Check which APIs are already enabled to avoid unnecessary calls (optimization)
+ENABLED_APIS=$(gcloud services list --enabled --format="value(config.name)")
+
+for api in "${REQUIRED_APIS[@]}"; do
+  if echo "$ENABLED_APIS" | grep -q "$api"; then
+    log "API $api is already enabled."
+  else
+    run_command gcloud services enable "$api" "Enabling API: $api"
+  fi
+done
+
+
+# 3. Reserve Static IP
+log "Reserving static IP address..."
+STATIC_IP_NAME="${config[VM_NAME]}-ip"
+IP_ADDRESS=""
+
+# Check if IP exists
+if gcloud compute addresses describe "$STATIC_IP_NAME" --region="${config[REGION]}" >/dev/null 2>&1; then
+  IP_ADDRESS=$(gcloud compute addresses describe "$STATIC_IP_NAME" --region="${config[REGION]}" --format="value(address)")
+  log "Static IP $STATIC_IP_NAME already exists: $IP_ADDRESS"
+else
+  run_command gcloud compute addresses create "$STATIC_IP_NAME" --region="${config[REGION]}" "Creating static IP $STATIC_IP_NAME"
+  IP_ADDRESS=$(gcloud compute addresses describe "$STATIC_IP_NAME" --region="${config[REGION]}" --format="value(address)")
+  log "Created static IP $STATIC_IP_NAME: $IP_ADDRESS"
+fi
+
+# Export IP to config (in memory) for subsequent scripts? 
+# Actually, create-vm.sh can just look it up by name or we pass it.
+# We'll pass it via environment variable or argument if needed, or let create-vm lookup.
+# For simplicity, create-vm.sh will look it up using the same name convention or we pass it as an arg.
+# Let's verify we have an IP
+if [[ -z "$IP_ADDRESS" ]]; then
+  error_exit "Failed to obtain static IP address."
+fi
+
+
+# 4. Create Service Account
+log "Creating Service Account..."
+SA_NAME="${config[SERVICE_ACCOUNT_NAME]}"
+SA_EMAIL="${SA_NAME}@${config[PROJECT_ID]}.iam.gserviceaccount.com"
+
+if gcloud iam service-accounts describe "$SA_EMAIL" >/dev/null 2>&1; then
+  log "Service Account $SA_EMAIL already exists."
+else
+  run_command gcloud iam service-accounts create "$SA_NAME" \
+    --display-name="Service Account for ${config[VM_NAME]}" \
+    "Creating Service Account $SA_NAME"
+fi
+
+# Grant necessary permissions to the Service Account
+# Minimum roles: Logging, Monitoring, Storage Object Admin (for backups)
+log "Granting roles to Service Account..."
+ROLES=(
+  "roles/logging.logWriter"
+  "roles/monitoring.metricWriter"
+  "roles/monitoring.viewer"
+  "roles/storage.objectAdmin" # Read/Write to GCS buckets
+  "roles/secretmanager.secretAccessor" # If fetching secrets
+  "roles/artifactregistry.reader" # If pulling images
+)
+
+for role in "${ROLES[@]}"; do
+    # Check if policy binding already exists to avoid cluttering logs/errors? 
+    # add-iam-policy-binding is idempotent but prints a lot.
+    run_command gcloud projects add-iam-policy-binding "${config[PROJECT_ID]}" \
+      --member="serviceAccount:${SA_EMAIL}" \
+      --role="$role" \
+      "Granting $role to $SA_EMAIL" >/dev/null
+done
+
+
+# 5. Create GCS Bucket for Backups
+log "Creating GCS bucket for backups..."
+BUCKET_NAME="${config[GCS_BUCKET_NAME]}"
+
+if gsutil ls -b "gs://${BUCKET_NAME}" >/dev/null 2>&1; then
+  log "GCS Bucket gs://${BUCKET_NAME} already exists."
+else
+  # Create bucket (standard storage, regional)
+  run_command gsutil mb -p "${config[PROJECT_ID]}" -c standard -l "${config[REGION]}" -b on "gs://${BUCKET_NAME}" "Creating GCS Bucket gs://${BUCKET_NAME}"
+  # Enable versioning (recommended for backups)
+  run_command gsutil versioning set on "gs://${BUCKET_NAME}" "Enabling versioning on gs://${BUCKET_NAME}"
+  
+  # Lifecycle rule: Delete objects older than 30 days (example)
+  # Create a temporary lifecycle json
+  cat > lifecycle.json <<EOF
+{
+  "rule": [
+    {
+      "action": {"type": "Delete"},
+      "condition": {"age": 30}
+    }
+  ]
+}
+EOF
+  run_command gsutil lifecycle set lifecycle.json "gs://${BUCKET_NAME}" "Setting lifecycle rule on gs://${BUCKET_NAME}"
+  rm -f lifecycle.json
+fi
+
+
+# 6. Call Sub-scripts
+
+# 6.1 Create VM
+log "=== Step 6.1: Creating VM ==="
+"${SCRIPT_DIR}/gcp-01-create-vm.sh"
+
+# 6.2 Configure Firewall
+log "=== Step 6.2: Configuring Firewall ==="
+"${SCRIPT_DIR}/gcp-02-firewall-open.sh"
+
+# 6.3 Monitoring (Optional)
+if [[ "${config[ENABLE_MONITORING]}" == "true" ]]; then
+  log "=== Step 6.3: Setting up Monitoring ==="
+  "${SCRIPT_DIR}/gcp-03-setup-monitoring.sh"
+else
+  log "Skipping Monitoring setup (ENABLE_MONITORING != true)"
+fi
+
+# 6.4 Secrets (Optional)
+if [[ "${config[USE_SECRET_MANAGER]}" == "true" ]]; then
+    log "=== Step 6.4: Creating Secrets ==="
+    "${SCRIPT_DIR}/gcp-04-create-secrets.sh"
+else
+    log "Skipping Secret Manager setup (USE_SECRET_MANAGER != true)"
+fi
+
+# 6.5 Artifact Registry (Optional)
+# If you plan to deploy containers
+log "=== Step 6.5: Creating Artifact Registry ==="
+"${SCRIPT_DIR}/gcp-05-create-artifact-registry.sh"
+
+
+# --- Post-Creation Setup on the VM ---
+# This part is crucial. We have created the infrastructure.
+# Now we need to provision the software *inside* the VM.
+# We can use `gcloud compute ssh` to execute the host setup scripts.
+
+log "Waiting for VM to be ready for SSH..."
+# Simple loop to wait for SSH
+for i in {1..20}; do
+  if gcloud compute ssh "${config[VM_NAME]}" --zone="${config[ZONE]}" --command="echo SSH Ready" >/dev/null 2>&1; then
+    log "VM is SSH accessible."
+    break
+  fi
+  log "Waiting for SSH... ($i/20)"
+  sleep 10
+done
+
+log "=== Uploading setup scripts to VM ==="
+# We copy the entire current directory (deployment/vm-setup) to the VM
+# so it has access to all scripts and config.
+# Excluding common.sh and config.sh because they are needed, wait, we need everything.
+# We'll copy to a 'setup' directory in the home folder.
+
+# Use scp to copy files
+# Note: --recurse is for gcloud compute scp
+run_command gcloud compute scp --recurse "${SCRIPT_DIR}" "${config[VM_NAME]}:~/vm-setup" --zone="${config[ZONE]}" "Uploading setup scripts to VM"
+
+log "=== Executing Host Setup Scripts on VM ==="
+
+# We need to construct a command that runs the scripts in order.
+# We also need to ensure environment variables from config.sh are available, 
+# or rely on config.sh being present on the VM (which we just uploaded).
+# Since we uploaded the whole folder, the scripts on the VM can source config.sh relative to themselves.
+
+# However, config.sh might rely on local env vars if they were not hardcoded?
+# In this design, config.sh contains the values. If config.sh uses `export VAR=${VAR:-default}`, 
+# we need to ensure the values are set.
+# If the user edited config.sh locally, those values are in the file we uploaded. 
+# So sourcing config.sh on the VM should work, PROVIDED config.sh doesn't rely on 
+# environment variables from the *host* machine (the one running this script) that aren't in the file.
+
+# Let's look at how we run the remote script.
+# We'll make the scripts executable and run host-00-setup.sh which acts as a master script or run them individually.
+# Looking at the file list, there isn't a master 'host-all' script, but host-00-setup.sh seems like a good start or we run them sequentially here.
+# Wait, host-00-setup.sh is "setup".
+# Let's iterate through the host scripts.
+
+HOST_SCRIPTS=(
+  "host-00-setup.sh"
+  "host-01-create-swap.sh"
+  "host-02-setup-duckdns.sh"
+  "host-03-firewall-config.sh"
+  "host-04-install-nginx.sh"
+  "host-05-setup-ssl.sh"
+  "host-06-setup-security.sh"
+  "host-07-setup-backups.sh"
+  "host-08-test-backup-restore.sh" # Optional, maybe manual? Included for now.
+  "host-09-setup-ops-agent.sh"
+  "host-cleanup.sh"
+)
+
+# Prepare the remote command execution
+# We want to run this in a non-interactive shell.
+# We need to make sure 'config.sh' variables are respected.
+# The scripts source common.sh and config.sh.
+
+# Issue: DUCKDNS_TOKEN might be sensitive and not in config.sh if passed via ENV.
+# If config.sh has `DUCKDNS_TOKEN=${DUCKDNS_TOKEN:-""}`, and we run on VM, it will be empty unless we export it.
+
+# We will construct a block of exports for variables that might be sensitive or dynamic.
+# Explicitly passing critical config vars as environment variables to the remote SSH command.
+
+# Variables to pass explicitly
+VM_ENV_VARS=(
+  "DUCKDNS_TOKEN=${config[DUCKDNS_TOKEN]}"
+  "GCS_BUCKET_NAME=${config[GCS_BUCKET_NAME]}"
+)
+
+# Build the setup command
+# We use a heredoc to define the remote script execution for cleanliness
+# BUT passing env vars to gcloud ssh command property is tricky. 
+# Best way: Prepend exports to the command string.
+
 ENV_SETUP_COMMAND=""
 for var_entry in "${VM_ENV_VARS[@]}"; do
+  # Split key and value
   KEY="${var_entry%%=*}"
   VALUE="${var_entry#*=}"
-  # Escape double quotes in the value to ensure it's correctly interpreted by bash on the VM
-  ESCAPED_VALUE=$(printf %s "$VALUE" | sed 's/"/\\"/g')
-  ENV_SETUP_COMMAND+="echo 'export $KEY=\"$ESCAPED_VALUE\"' >> ~/.bashrc;"
+  # Escape value for shell safety (basic)
+  # This simple escaping might not handle all edge cases but suffices for typical tokens
+  ESCAPED_VALUE=$(printf '%q' "$VALUE")
+  # Append to command string. We export them and also append to .bashrc for persistence if needed
+  # (though usually only needed for the session).
+  # Persistence is useful for cron jobs or future sessions.
+  ENV_SETUP_COMMAND+="export $KEY=$ESCAPED_VALUE; "
+  # Optional: Persist to .bashrc on VM (be careful with secrets)
+  # ENV_SETUP_COMMAND+="echo 'export $KEY=$ESCAPED_VALUE' >> ~/.bashrc; "
 done
-ENV_SETUP_COMMAND+="echo 'Environment variables set in ~/.bashrc. Please source ~/.bashrc or re-login for them to take effect in new sessions.'"
 
-# Execute the command on the VM to set environment variables
-run_command_with_retry \
-    "gcloud compute ssh \"${config[VM_NAME]}\" --zone=\"${config[ZONE]}\" --project=\"${config[PROJECT_ID]}\" --command \"$ENV_SETUP_COMMAND\"" \
-    "Setting environment variables on VM '${config[VM_NAME]}' in ~/.bashrc"
+# Fix for ShellCheck errors SC1078, SC1079:
+# Ensure quotes are properly closed and variable expansion is safe.
+# We will use a simpler approach for the remote command to avoid complex nested quoting hell.
+# We will write a temporary runner script on the remote machine.
 
-# SSH into the VM
-log_info "Initiating SSH session to VM '${config[VM_NAME]}'..."
-# This is an interactive command, so we don't wrap it in run_command_with_retry
-# as it's the final interactive step.
-gcloud compute ssh "${config[VM_NAME]}" --zone="${config[ZONE]}" --project="${config[PROJECT_ID]}"
+log "Generating remote runner script..."
 
+# Create a temporary runner script locally
+cat > runner.sh <<EOF
+#!/bin/bash
+set -e
+cd ~/vm-setup
+
+# Export sensitive variables passed from local machine
+export DUCKDNS_TOKEN="${config[DUCKDNS_TOKEN]}"
+export GCS_BUCKET_NAME="${config[GCS_BUCKET_NAME]}"
+export PROJECT_ID="${config[PROJECT_ID]}"
+export REGION="${config[REGION]}"
+export ZONE="${config[ZONE]}"
+
+# Make scripts executable
+chmod +x *.sh
+
+# Execute scripts in order
+EOF
+
+for script in "${HOST_SCRIPTS[@]}"; do
+  echo "./$script" >> runner.sh
+done
+
+# Upload the runner
+run_command gcloud compute scp runner.sh "${config[VM_NAME]}:~/vm-setup/runner.sh" --zone="${config[ZONE]}" "Uploading runner script"
+rm -f runner.sh
+
+# Execute the runner
+log "Executing runner script on VM..."
+run_command gcloud compute ssh "${config[VM_NAME]}" --zone="${config[ZONE]}" --command="chmod +x ~/vm-setup/runner.sh && ~/vm-setup/runner.sh" "Running host setup scripts"
+
+# 7. Validation
+log "=== Step 7: Final Validation ==="
+"${SCRIPT_DIR}/gcp-06-validate.sh"
+
+log "GCP Environment Setup Complete!"
 echo ""
-printf '=%.0s' {1..60}; echo
-log_success "✅ GCP setup completed successfully!"
-printf '=%.0s' {1..60}; echo
-
-END_TIME=$(date +%s)
-DURATION=$((END_TIME - START_TIME))
-log_info "⏱️  Total setup time: $((DURATION / 60))m $((DURATION % 60))s"
+echo "You can SSH into your VM using:"
+echo "gcloud compute ssh ${config[VM_NAME]} --zone=${config[ZONE]}"
 echo ""
