@@ -139,12 +139,12 @@ verify_gcloud_auth() {
 
 # Function to run a command with retries and error handling
 # Arguments:
-#   $1: The command string to execute
+#   : The command string to execute
 #   $2: A description of the command for logging
 #   $3: (Optional) Number of retries (default: 5)
 #   $4: (Optional) Delay between retries in seconds (default: 10)
 run_command_with_retry() {
-    local cmd="$1"
+    local cmd=""
     local description="$2"
     local retries="${3:-5}"   # Default to 5 retries
     local delay="${4:-10}"   # Default to 10 seconds delay
@@ -209,7 +209,7 @@ echo ""
 
 # Verify required tools (already done in common.sh or fallback)
 for tool in gcloud jq gsutil; do
-    if ! command -v "$tool" &> /dev/null; then
+    if ! command -v "$tool" &>/dev/null; then
         log_error "Required tool '$tool' is not installed."
         exit 1
     fi
