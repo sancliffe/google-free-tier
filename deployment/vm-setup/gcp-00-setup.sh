@@ -136,7 +136,7 @@ done
 
 # 5. Create GCS Bucket for Backups
 log_info "Creating GCS bucket for backups..."
-BUCKET_NAME="${GCS_BUCKET_NAME}"
+BUCKET_NAME=$(echo "${GCS_BUCKET_NAME}" | tr '[:upper:]' '[:lower:]')
 
 if gsutil ls -b "gs://${BUCKET_NAME}" >/dev/null 2>&1; then
   log_info "GCS Bucket gs://${BUCKET_NAME} already exists."
