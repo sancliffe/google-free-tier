@@ -269,7 +269,7 @@ install_packages() {
     apt-get update -qq || { log_error "install_packages: Failed to update apt package lists. Check network connectivity or apt sources."; return 1; }
 
     log_info "Installing packages: ${packages[*]}..."
-    apt-get install -y "${packages[@]}" -qq || { log_error "install_packages: Failed to install packages: ${packages[*]}"; return 1; }
+    DEBIAN_FRONTEND=noninteractive apt-get install -y "${packages[@]}" -qq || { log_error "install_packages: Failed to install packages: ${packages[*]}"; return 1; }
 
     log_success "Successfully installed packages: ${packages[*]}"
 }
