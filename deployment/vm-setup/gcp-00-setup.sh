@@ -230,6 +230,13 @@ verify_gcloud_auth
 START_TIME=$(date +%s)
 load_and_prompt_config
 
+# Convert GCS bucket names to lowercase to prevent errors
+log_info "Converting GCS bucket names to lowercase to ensure compliance..."
+config[GCS_BUCKET_NAME]=$(echo "${config[GCS_BUCKET_NAME]}" | tr '[:upper:]' '[:lower:]')
+config[TF_STATE_BUCKET]=$(echo "${config[TF_STATE_BUCKET]}" | tr '[:upper:]' '[:lower:]')
+log_info "  New GCS_BUCKET_NAME: ${config[GCS_BUCKET_NAME]}"
+log_info "  New TF_STATE_BUCKET: ${config[TF_STATE_BUCKET]}"
+
 # Ensure all setup scripts are executable
 chmod +x "${SCRIPT_DIR}"/gcp-0*.sh
 
