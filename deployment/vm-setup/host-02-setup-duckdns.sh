@@ -3,7 +3,13 @@
 # Sets up a cron job to update DuckDNS for dynamic IP.
 
 # shellcheck disable=SC1091
-source "$(dirname "$0")/common.sh"
+COMMON_SH="$(dirname "$0")/common.sh"
+if [[ -f "$COMMON_SH" ]]; then
+    source "$COMMON_SH"
+else
+    echo "ERROR: common.sh not found at $COMMON_SH"
+    exit 1
+fi
 set_strict_mode
 
 print_newline
