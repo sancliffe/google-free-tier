@@ -2,27 +2,18 @@
 # host-04-install-nginx.sh
 # Installs and configures Nginx with basic optimizations for e2-micro.
 
-set -e
+set_strict_mode
 # shellcheck disable=SC1091
 source "$(dirname "$0")/common.sh"
 
-echo ""
-echo "============================================================"
-log_info "Phase 2: Installing Nginx"
-echo "============================================================"
-echo ""
+print_newline
+log_info "Starting Nginx installation and configuration..."
+print_newline
 
 check_root
 
 # 1. Install Nginx
-log_info "Checking for apt locks..."
-wait_for_apt_lock
-
-log_info "Updating package lists..."
-apt-get update -qq
-
-log_info "Installing Nginx..."
-apt-get install -y nginx -qq
+install_packages "nginx"
 
 log_success "Nginx installed successfully."
 
@@ -42,7 +33,9 @@ sed -i 's/gzip on;/gzip off;/g' "$NGINX_CONF"
 log_info "Disabled default gzip settings in main nginx.conf to save CPU"
 
 # Create a custom config for timeout and buffer adjustments
-OPTIM_CONF="/etc/nginx/conf.d/e2-micro-optimizations.conf"
+OPTIM_CONF="/etc/nginx/conf.d/e2-micro-optimizations.conf" # This file is created if it doesn't exist.
+# Only backup if the file already exists.
+if [ -f "$OPTIM_CONF" ]; then
 backup_file "$OPTIM_CONF"
 
 cat > "$OPTIM_CONF" <<EOF
@@ -58,6 +51,7 @@ client_header_timeout 12;
 keepalive_timeout 15;
 send_timeout 10;
 EOF
+fi
 
 log_success "Nginx optimization config created at $OPTIM_CONF."
 

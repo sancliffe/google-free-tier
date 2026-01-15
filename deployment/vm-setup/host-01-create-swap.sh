@@ -20,11 +20,9 @@ SWAP_SIZE="2G" # 2 Gigabytes
 SWAPPINESS_VALUE="10" # 10 is a good value for servers
 
 main() {
-    echo ""
-    printf '=%.0s' {1..60}; echo
+    print_newline
+    print_banner
     log_info "Phase 1: Configuring Swap File"
-    printf '=%.0s' {1..60}; echo
-    echo ""
     ensure_root || exit 1
 
     # Check disk space before creating swap
@@ -45,9 +43,7 @@ main() {
                  log_error "Failed to enable swap."
                  exit 1
              }
-        fi
-        echo ""
-        exit 0
+        fi # End of if swapon --show
     fi
 
     log_info "Creating swap file at ${SWAP_FILE_PATH} with size ${SWAP_SIZE}..."
@@ -89,19 +85,20 @@ main() {
     # This ensures the swap file is activated on reboot.
     echo "${SWAP_FILE_PATH} none swap sw 0 0" >> /etc/fstab
 
-    log_info "Tuning swappiness to ${SWAPPINESS_VALUE}..."
-    # Swappiness determines how aggressively the system uses swap.
-    # A low value is better for server performance.
-    sysctl vm.swappiness="${SWAPPINESS_VALUE}"
-    
-    log_info "Making swappiness setting permanent..."
-    backup_file "/etc/sysctl.conf" "/tmp"
-    echo "vm.swappiness=${SWAPPINESS_VALUE}" >> /etc/sysctl.conf
-
     log_success "Swap file configured successfully."
-    log_info "Verifying swap status..."
-    free -h || log_warn "Could not run free -h"
-    echo ""
 }
+
+log_info "Tuning swappiness to ${SWAPPINESS_VALUE}..."
+# Swappiness determines how aggressively the system uses swap.
+# A low value is better for server performance.
+sysctl vm.swappiness="${SWAPPINESS_VALUE}"
+
+log_info "Making swappiness setting permanent..."
+backup_file "/etc/sysctl.conf" "/tmp"
+echo "vm.swappiness=${SWAPPINESS_VALUE}" >> /etc/sysctl.conf
+
+log_info "Verifying swap status..."
+free -h || log_warn "Could not run free -h"
+print_newline
 
 main "${1:-}"

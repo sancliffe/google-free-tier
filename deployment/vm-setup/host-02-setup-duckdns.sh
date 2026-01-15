@@ -2,15 +2,13 @@
 # host-02-setup-duckdns.sh
 # Sets up a cron job to update DuckDNS for dynamic IP.
 
-set -e
+set_strict_mode
 # shellcheck disable=SC1091
 source "$(dirname "$0")/common.sh"
 
-echo ""
-echo "============================================================"
-log_info "Phase 3: Setting up DuckDNS"
-echo "============================================================"
-echo ""
+print_newline
+log_info "Starting DuckDNS setup..."
+print_newline
 
 check_root
 
@@ -38,7 +36,7 @@ LOG_PATH="/var/log/duckdns.log"
 cat > "$SCRIPT_PATH" <<EOF
 #!/bin/bash
 # Update DuckDNS
-echo url="https://www.duckdns.org/update?domains=$DUCKDNS_DOMAIN&token=$DUCKDNS_TOKEN&ip=" | curl -k -o $LOG_PATH -K -
+curl -k "https://www.duckdns.org/update?domains=$DUCKDNS_DOMAIN&token=$DUCKDNS_TOKEN&ip=" -o "$LOG_PATH"
 EOF
 
 chmod +x "$SCRIPT_PATH"

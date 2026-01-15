@@ -83,6 +83,11 @@ fetch_secret() {
     local env_var_name="${2:-}"
     local secret_value=""
 
+    if [[ -z "$secret_name" ]]; then
+        log_error "fetch_secret: secret_name cannot be empty. Usage: fetch_secret <secret_name> [env_var_fallback_name]" >&2
+        return 1
+    fi
+
     # 1. Try to fetch from Google Cloud Secret Manager
     if command -v gcloud &> /dev/null; then
         # Check if we are authenticated or on a VM with scopes
@@ -91,6 +96,8 @@ fetch_secret() {
                 echo "$secret_value"
                 return 0
             fi
+        else
+            log_debug "fetch_secret: gcloud secrets access failed for '$secret_name'. (This is expected if not authenticated or secret doesn't exist in Secret Manager)."
         fi
     fi
 
@@ -99,6 +106,8 @@ fetch_secret() {
         # Check if variable is set in current environment
         echo "${!env_var_name}"
         return 0
+    else
+        log_debug "fetch_secret: Environment variable '$env_var_name' not set or empty."
     fi
 
     # 3. Try reading from a local config.sh file (Fallback)
@@ -107,15 +116,20 @@ fetch_secret() {
     if [[ -f "$script_dir/config.sh" ]]; then
         # Source the config file in a subshell to check for the variable
         # shellcheck disable=SC1091
-        secret_value=$(source "$script_dir/config.sh" 2>/dev/null && echo "${!env_var_name}")
+        # Source config.sh with its stdout redirected to /dev/null to prevent
+        # any 'echo' statements within config.sh from polluting the output.
+        # Then, explicitly echo the value of the requested environment variable.
+        secret_value=$( (source "$script_dir/config.sh" >/dev/null 2>&1; echo "${!env_var_name}") )
         if [[ -n "$secret_value" ]]; then
             echo "$secret_value"
             return 0
         fi
+    else
+        log_debug "fetch_secret: config.sh not found or variable '$env_var_name' not defined within it."
     fi
 
     # 4. If all fail, return 1
-    log_warn "Could not retrieve secret '$secret_name' from Secret Manager or environment variable '$env_var_name'." >&2
+    log_error "Failed to retrieve secret '$secret_name'. Please ensure it's in Secret Manager, set as environment variable '$env_var_name', or defined in config.sh." >&2
     return 1
 }
 
@@ -138,13 +152,18 @@ backup_file() {
     local file_path="$1"
     local dest_dir="${2:-}" 
     
+    if [[ -z "$file_path" ]]; then
+        log_error "backup_file: file_path cannot be empty. Usage: backup_file <file_to_backup> [destination_directory]"
+        return 1
+    fi
+
     if [ -f "$file_path" ]; then
         local timestamp
         timestamp=$(date +%s)
         local backup_path
         
         if [ -n "$dest_dir" ]; then
-             mkdir -p "$dest_dir"
+             mkdir -p "$dest_dir" || { log_error "backup_file: Failed to create backup directory '$dest_dir'."; return 1; }
              backup_path="${dest_dir}/$(basename "$file_path").bak.${timestamp}"
         else
              backup_path="${file_path}.bak.${timestamp}"
@@ -152,8 +171,10 @@ backup_file() {
         
         cp "$file_path" "$backup_path"
         log_success "Backed up '$file_path' to '$backup_path'"
+    elif [ ! -e "$file_path" ]; then # Check if it doesn't exist at all
+        log_debug "File '$file_path' does not exist, skipping backup as it's not present."
     else
-        log_warn "File '$file_path' does not exist, skipping backup."
+        log_warn "File '$file_path' is not a regular file or does not exist, skipping backup."
     fi
 }
 
@@ -173,14 +194,61 @@ check_disk_space() {
     local path="$1"
     local required_mb="$2"
     
+    if [[ -z "$path" ]]; then
+        log_error "check_disk_space: path cannot be empty. Usage: check_disk_space <path> <required_mb>"
+        return 1
+    fi
+    if ! [[ "$required_mb" =~ ^[0-9]+$ ]] || (( required_mb <= 0 )); then
+        log_error "check_disk_space: required_mb must be a positive integer. Received: '$required_mb'."
+        return 1
+    fi
+
     # Get available space in KB
     local available_kb
-    available_kb=$(df -k --output=avail "$path" | tail -n 1)
-    local available_mb=$((available_kb / 1024))
+    if ! available_kb=$(df -k --output=avail "$path" 2>/dev/null | tail -n 1); then
+        log_error "check_disk_space: Failed to get disk space for path '$path'. Is the path valid?"
+        return 1
+    fi
+    local available_mb=$((available_kb / 1024)) # Integer division is fine here
     
     if [[ "$available_mb" -lt "$required_mb" ]]; then
         log_error "Insufficient disk space on $path. Required: ${required_mb}MB, Available: ${available_mb}MB"
         return 1
     fi
     log_info "Disk space check passed. Available: ${available_mb}MB"
+}
+
+# -----------------------------------------------------------------------------
+# Output Formatting
+# -----------------------------------------------------------------------------
+# Prints a standardized banner for visual separation in logs.
+print_banner() {
+    printf '=%.0s' {1..60}
+    print_newline
+}
+
+# Prints a single empty line for spacing.
+print_newline() {
+    echo ""
+}
+
+# -----------------------------------------------------------------------------
+# Package Management
+# -----------------------------------------------------------------------------
+# Updates apt package lists and installs specified packages.
+install_packages() {
+    local packages=("$@")
+    if [[ ${#packages[@]} -eq 0 ]]; then
+        log_warn "install_packages: No packages specified for installation. Skipping."
+        return 0 # Not an error, just nothing to do
+    fi
+
+    wait_for_apt_lock
+    log_info "Updating package lists..."
+    apt-get update -qq || { log_error "install_packages: Failed to update apt package lists. Check network connectivity or apt sources."; return 1; }
+
+    log_info "Installing packages: ${packages[*]}..."
+    apt-get install -y "${packages[@]}" -qq || { log_error "install_packages: Failed to install packages: ${packages[*]}"; return 1; }
+
+    log_success "Successfully installed packages: ${packages[*]}"
 }

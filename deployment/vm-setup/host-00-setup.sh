@@ -4,7 +4,7 @@
 # It runs on the VM instance to configure software and settings.
 # It runs each setup script in sequence.
 
-set -eo pipefail
+set_strict_mode
 
 # --- Preamble ---
 
@@ -41,19 +41,46 @@ log() {
 }
 
 # Ensure running as root
-if [[ $EUID -ne 0 ]]; then
-   log_error "This script must be run as root."
-   exit 1
-fi
+ensure_root
 
 # --- Main ---
 
-echo ""
-printf '=%.0s' {1..60}; echo
+# Default flags for skipping steps
+SKIP_SWAP=false
+SKIP_DUCKDNS=false
+SKIP_FIREWALL=false
+SKIP_NGINX=false
+NON_INTERACTIVE=false
+
+# Parse command-line arguments
+while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+        --skip-swap) SKIP_SWAP=true ;;
+        --skip-duckdns) SKIP_DUCKDNS=true ;;
+        --skip-firewall) SKIP_FIREWALL=true ;;
+        --skip-nginx) SKIP_NGINX=true ;;
+        --non-interactive) NON_INTERACTIVE=true ;;
+        -h|--help)
+            echo "Usage: $0 [OPTIONS]"
+            echo "  --skip-swap         Skip swap file configuration."
+            echo "  --skip-duckdns      Skip DuckDNS setup."
+            echo "  --skip-firewall     Skip firewall configuration."
+            echo "  --skip-nginx        Skip Nginx installation."
+            echo "  --non-interactive   Run without user prompts."
+            echo "  -h, --help          Display this help message."
+            exit 0
+            ;;
+        *) log_error "Unknown option: $1. Use -h or --help for usage."; exit 1 ;;
+    esac
+    shift
+done
+
+print_newline
+print_banner
 log "Starting Host setup..."
 log "⏱️  Estimated time: 5-10 minutes"
-printf '=%.0s' {1..60}; echo
-echo ""
+print_banner
+print_newline
 
 # Verify required tools
 for tool in grep sed awk; do
@@ -65,28 +92,54 @@ done
 
 START_TIME=$(date +%s)
 
-# Ensure scripts are executable
-chmod +x "${SCRIPT_DIR}"/host-0[1-9]*.sh 2>/dev/null || true
+# Ensure sub-scripts are executable
+find "${SCRIPT_DIR}" -maxdepth 1 -name "host-0[1-9]*.sh" -exec chmod +x {} \;
 
 log "Checking existing configuration..."
-SKIP_COUNT=0
-CREATE_COUNT=0
 
-echo ""
+# Flags for actual execution status
+RUN_SWAP=true
+RUN_DUCKDNS=true
+RUN_FIREWALL=true
+RUN_NGINX=true
+
+print_newline
 # Check Swap (Phase 1)
 if grep -q "/swapfile" /etc/fstab; then
   log "  ⏭️  Swap file: Already configured"
-  SKIP_COUNT=$((SKIP_COUNT + 1))
+  RUN_SWAP=false
 else
   log "  ✨ Swap file: Will configure"
-  CREATE_COUNT=$((CREATE_COUNT + 1))
 fi
 
-echo ""
-log "📊 Summary: $((CREATE_COUNT + 3)) tasks to run, $SKIP_COUNT tasks to skip"
+# Apply skip flags
+if "$SKIP_SWAP"; then
+    log "  ⏭️  Swap configuration: Skipped by --skip-swap flag."
+    RUN_SWAP=false
+fi
+if "$SKIP_DUCKDNS"; then
+    log "  ⏭️  DuckDNS setup: Skipped by --skip-duckdns flag."
+    RUN_DUCKDNS=false
+fi
+if "$SKIP_FIREWALL"; then
+    log "  ⏭️  Firewall configuration: Skipped by --skip-firewall flag."
+    RUN_FIREWALL=false
+fi
+if "$SKIP_NGINX"; then
+    log "  ⏭️  Nginx installation: Skipped by --skip-nginx flag."
+    RUN_NGINX=false
+fi
+
+print_newline
+
+log "📊 Final Plan:"
+log "  Swap Configuration: $(if "$RUN_SWAP"; then echo "RUN"; else echo "SKIP"; fi)"
+log "  DuckDNS Setup:      $(if "$RUN_DUCKDNS"; then echo "RUN"; else echo "SKIP"; fi)"
+log "  Firewall Config:    $(if "$RUN_FIREWALL"; then echo "RUN"; else echo "SKIP"; fi)"
+log "  Nginx Installation: $(if "$RUN_NGINX"; then echo "RUN"; else echo "SKIP"; fi)"
 echo ""
 
-if [ -t 0 ]; then
+if [ -t 0 ] && ! "$NON_INTERACTIVE"; then
     read -p "Continue with setup? (y/N): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -94,32 +147,39 @@ if [ -t 0 ]; then
       exit 0
     fi
 else
-    log "Non-interactive session detected. Proceeding..."
+    log "Non-interactive mode detected. Proceeding..."
 fi
 
-echo ""
-printf '=%.0s' {1..60}; echo
+print_newline
+print_banner
 log "🚀 Starting setup execution..."
-printf '=%.0s' {1..60}; echo
+print_banner
 
-# Execute setup scripts in order
-log "Step 1/4: Configuring Swap..."
-"${SCRIPT_DIR}/host-01-create-swap.sh"
+# Execute setup scripts based on flags
+if "$RUN_SWAP"; then
+    log "Step 1/4: Configuring Swap..."
+    "${SCRIPT_DIR}/host-01-create-swap.sh"
+fi
 
-"${SCRIPT_DIR}/host-02-setup-duckdns.sh"
-log "Step 2/4: Setting up DuckDNS..."
-"${SCRIPT_DIR}/host-02-setup-duckdns.sh"
+if "$RUN_DUCKDNS"; then
+    log "Step 2/4: Setting up DuckDNS..."
+    "${SCRIPT_DIR}/host-02-setup-duckdns.sh"
+fi
 
-log "Step 3/4: Configuring Firewall..."
-"${SCRIPT_DIR}/host-03-firewall-config.sh"
+if "$RUN_FIREWALL"; then
+    log "Step 3/4: Configuring Firewall..."
+    "${SCRIPT_DIR}/host-03-firewall-config.sh"
+fi
 
-log "Step 4/4: Installing Nginx..."
-"${SCRIPT_DIR}/host-04-install-nginx.sh"
+if "$RUN_NGINX"; then
+    log "Step 4/4: Installing Nginx..."
+    "${SCRIPT_DIR}/host-04-install-nginx.sh"
+fi
 
-echo ""
-printf '=%.0s' {1..60}; echo
+print_newline
+print_banner
 log "✅ Host setup completed successfully!"
-printf '=%.0s' {1..60}; echo
+print_banner
 
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
