@@ -12,9 +12,8 @@ echo "Running pre-commit checks..."
 
 # Check shell scripts with shellcheck
 echo "--> Running shellcheck on staged shell scripts..."
-STAGED_SH_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.sh$' || true)
-if [ -n "$STAGED_SH_FILES" ]; then
-  shellcheck "$STAGED_SH_FILES"
+if git diff --cached --name-only --diff-filter=ACM -- '*.sh' | grep -q .; then
+  git diff --cached --name-only --diff-filter=ACM -z -- '*.sh' | xargs -0 shellcheck
   if [ $? -ne 0 ]; then
     echo "Shellcheck failed. Please fix the issues before committing."
     exit 1
@@ -25,9 +24,8 @@ fi
 
 # Check Terraform formatting
 echo "--> Running terraform fmt -check on staged .tf files..."
-STAGED_TF_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.tf$')
-if [ -n "$STAGED_TF_FILES" ]; then
-  terraform fmt -check $STAGED_TF_FILES
+if git diff --cached --name-only --diff-filter=ACM -- '*.tf' | grep -q .; then
+  git diff --cached --name-only --diff-filter=ACM -z -- '*.tf' | xargs -0 terraform fmt -check
   if [ $? -ne 0 ]; then
     echo "Terraform formatting issues detected. Run 'terraform fmt' to fix."
     exit 1
