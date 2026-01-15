@@ -56,6 +56,26 @@ log_debug() {
     fi
 }
 
+error_exit() {
+    log_error "$1"
+    exit 1
+}
+
+# A function to run a command and log it.
+# The last argument is the description.
+run_command() {
+    local description="${@: -1}"
+    # All arguments except the last are the command
+    local cmd=("${@:1:$#-1}")
+
+    log_info "$description"
+    # Execute the command
+    if ! "${cmd[@]}"; then
+        error_exit "Command failed: '${cmd[*]}'"
+    fi
+}
+
+
 # -----------------------------------------------------------------------------
 # Error Handling & Mode Settings
 # -----------------------------------------------------------------------------

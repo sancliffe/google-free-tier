@@ -31,10 +31,10 @@ source "${SCRIPT_DIR}/config.sh"
 
 # --- Main Execution ---
 
-log "Starting GCP environment setup..."
+log_info "Starting GCP environment setup..."
 
 # 1. Configuration (Project, Region, Zone)
-log "Configuring GCP project settings..."
+log_info "Configuring GCP project settings..."
 if [[ -z "${config[PROJECT_ID]}" ]]; then
   error_exit "PROJECT_ID is not set in config.sh"
 fi
@@ -51,7 +51,7 @@ if [[ -n "${config[ZONE]}" ]]; then
 fi
 
 # 2. Enable Required APIs
-log "Enabling required GCP APIs..."
+log_info "Enabling required GCP APIs..."
 REQUIRED_APIS=(
   "compute.googleapis.com"
   "logging.googleapis.com"
@@ -67,7 +67,7 @@ ENABLED_APIS=$(gcloud services list --enabled --format="value(config.name)")
 
 for api in "${REQUIRED_APIS[@]}"; do
   if echo "$ENABLED_APIS" | grep -q "$api"; then
-    log "API $api is already enabled."
+    log_info "API $api is already enabled."
   else
     run_command gcloud services enable "$api" "Enabling API: $api"
   fi
@@ -75,18 +75,18 @@ done
 
 
 # 3. Reserve Static IP
-log "Reserving static IP address..."
+log_info "Reserving static IP address..."
 STATIC_IP_NAME="${config[VM_NAME]}-ip"
 IP_ADDRESS=""
 
 # Check if IP exists
 if gcloud compute addresses describe "$STATIC_IP_NAME" --region="${config[REGION]}" >/dev/null 2>&1; then
   IP_ADDRESS=$(gcloud compute addresses describe "$STATIC_IP_NAME" --region="${config[REGION]}" --format="value(address)")
-  log "Static IP $STATIC_IP_NAME already exists: $IP_ADDRESS"
+  log_info "Static IP $STATIC_IP_NAME already exists: $IP_ADDRESS"
 else
   run_command gcloud compute addresses create "$STATIC_IP_NAME" --region="${config[REGION]}" "Creating static IP $STATIC_IP_NAME"
   IP_ADDRESS=$(gcloud compute addresses describe "$STATIC_IP_NAME" --region="${config[REGION]}" --format="value(address)")
-  log "Created static IP $STATIC_IP_NAME: $IP_ADDRESS"
+  log_info "Created static IP $STATIC_IP_NAME: $IP_ADDRESS"
 fi
 
 # Export IP to config (in memory) for subsequent scripts? 
@@ -100,12 +100,12 @@ fi
 
 
 # 4. Create Service Account
-log "Creating Service Account..."
+log_info "Creating Service Account..."
 SA_NAME="${config[SERVICE_ACCOUNT_NAME]}"
 SA_EMAIL="${SA_NAME}@${config[PROJECT_ID]}.iam.gserviceaccount.com"
 
 if gcloud iam service-accounts describe "$SA_EMAIL" >/dev/null 2>&1; then
-  log "Service Account $SA_EMAIL already exists."
+  log_info "Service Account $SA_EMAIL already exists."
 else
   run_command gcloud iam service-accounts create "$SA_NAME" \
     --display-name="Service Account for ${config[VM_NAME]}" \
@@ -114,7 +114,7 @@ fi
 
 # Grant necessary permissions to the Service Account
 # Minimum roles: Logging, Monitoring, Storage Object Admin (for backups)
-log "Granting roles to Service Account..."
+log_info "Granting roles to Service Account..."
 ROLES=(
   "roles/logging.logWriter"
   "roles/monitoring.metricWriter"
@@ -135,11 +135,11 @@ done
 
 
 # 5. Create GCS Bucket for Backups
-log "Creating GCS bucket for backups..."
+log_info "Creating GCS bucket for backups..."
 BUCKET_NAME="${config[GCS_BUCKET_NAME]}"
 
 if gsutil ls -b "gs://${BUCKET_NAME}" >/dev/null 2>&1; then
-  log "GCS Bucket gs://${BUCKET_NAME} already exists."
+  log_info "GCS Bucket gs://${BUCKET_NAME} already exists."
 else
   # Create bucket (standard storage, regional)
   run_command gsutil mb -p "${config[PROJECT_ID]}" -c standard -l "${config[REGION]}" -b on "gs://${BUCKET_NAME}" "Creating GCS Bucket gs://${BUCKET_NAME}"
@@ -166,32 +166,32 @@ fi
 # 6. Call Sub-scripts
 
 # 6.1 Create VM
-log "=== Step 6.1: Creating VM ==="
+log_info "=== Step 6.1: Creating VM ==="
 "${SCRIPT_DIR}/gcp-01-create-vm.sh"
 
 # 6.2 Configure Firewall
-log "=== Step 6.2: Configuring Firewall ==="
+log_info "=== Step 6.2: Configuring Firewall ==="
 "${SCRIPT_DIR}/gcp-02-firewall-open.sh"
 
 # 6.3 Monitoring (Optional)
 if [[ "${config[ENABLE_MONITORING]}" == "true" ]]; then
-  log "=== Step 6.3: Setting up Monitoring ==="
+  log_info "=== Step 6.3: Setting up Monitoring ==="
   "${SCRIPT_DIR}/gcp-03-setup-monitoring.sh"
 else
-  log "Skipping Monitoring setup (ENABLE_MONITORING != true)"
+  log_info "Skipping Monitoring setup (ENABLE_MONITORING != true)"
 fi
 
 # 6.4 Secrets (Optional)
 if [[ "${config[USE_SECRET_MANAGER]}" == "true" ]]; then
-    log "=== Step 6.4: Creating Secrets ==="
+    log_info "=== Step 6.4: Creating Secrets ==="
     "${SCRIPT_DIR}/gcp-04-create-secrets.sh"
 else
-    log "Skipping Secret Manager setup (USE_SECRET_MANAGER != true)"
+    log_info "Skipping Secret Manager setup (USE_SECRET_MANAGER != true)"
 fi
 
 # 6.5 Artifact Registry (Optional)
 # If you plan to deploy containers
-log "=== Step 6.5: Creating Artifact Registry ==="
+log_info "=== Step 6.5: Creating Artifact Registry ==="
 "${SCRIPT_DIR}/gcp-05-create-artifact-registry.sh"
 
 
@@ -200,18 +200,18 @@ log "=== Step 6.5: Creating Artifact Registry ==="
 # Now we need to provision the software *inside* the VM.
 # We can use `gcloud compute ssh` to execute the host setup scripts.
 
-log "Waiting for VM to be ready for SSH..."
+log_info "Waiting for VM to be ready for SSH..."
 # Simple loop to wait for SSH
 for i in {1..20}; do
   if gcloud compute ssh "${config[VM_NAME]}" --zone="${config[ZONE]}" --command="echo SSH Ready" >/dev/null 2>&1; then
-    log "VM is SSH accessible."
+    log_info "VM is SSH accessible."
     break
   fi
-  log "Waiting for SSH... ($i/20)"
+  log_info "Waiting for SSH... ($i/20)"
   sleep 10
 done
 
-log "=== Uploading setup scripts to VM ==="
+log_info "=== Uploading setup scripts to VM ==="
 # We copy the entire current directory (deployment/vm-setup) to the VM
 # so it has access to all scripts and config.
 # Excluding common.sh and config.sh because they are needed, wait, we need everything.
@@ -221,7 +221,7 @@ log "=== Uploading setup scripts to VM ==="
 # Note: --recurse is for gcloud compute scp
 run_command gcloud compute scp --recurse "${SCRIPT_DIR}" "${config[VM_NAME]}:~/vm-setup" --zone="${config[ZONE]}" "Uploading setup scripts to VM"
 
-log "=== Executing Host Setup Scripts on VM ==="
+log_info "=== Executing Host Setup Scripts on VM ==="
 
 # We need to construct a command that runs the scripts in order.
 # We also need to ensure environment variables from config.sh are available, 
@@ -298,7 +298,7 @@ done
 # We will use a simpler approach for the remote command to avoid complex nested quoting hell.
 # We will write a temporary runner script on the remote machine.
 
-log "Generating remote runner script..."
+log_info "Generating remote runner script..."
 
 # Create a temporary runner script locally
 cat > runner.sh <<EOF
@@ -328,14 +328,14 @@ run_command gcloud compute scp runner.sh "${config[VM_NAME]}:~/vm-setup/runner.s
 rm -f runner.sh
 
 # Execute the runner
-log "Executing runner script on VM..."
+log_info "Executing runner script on VM..."
 run_command gcloud compute ssh "${config[VM_NAME]}" --zone="${config[ZONE]}" --command="chmod +x ~/vm-setup/runner.sh && ~/vm-setup/runner.sh" "Running host setup scripts"
 
 # 7. Validation
-log "=== Step 7: Final Validation ==="
+log_info "=== Step 7: Final Validation ==="
 "${SCRIPT_DIR}/gcp-06-validate.sh"
 
-log "GCP Environment Setup Complete!"
+log_info "GCP Environment Setup Complete!"
 echo ""
 echo "You can SSH into your VM using:"
 echo "gcloud compute ssh ${config[VM_NAME]} --zone=${config[ZONE]}"
