@@ -166,43 +166,48 @@ if [[ -n "${ALERT_POLICIES}" ]]; then
 else
     log_info "No matching alert policies found to delete."
 fi
+fi
 
 # 4. Delete Secret Manager Secrets (from 4-create-secrets.sh)
-log_info "Step 4: Deleting secrets..."
-SECRETS=(
-    "duckdns_token"
-    "email_address"
-    "domain_name"
-    "gcs_bucket_name"
-    "tf_state_bucket"
-    "backup_dir"
-    "billing_account_id"
-)
-for SECRET in "${SECRETS[@]}"; do
-    if gcloud secrets describe "${SECRET}" --project="${PROJECT_ID}" &>/dev/null; then
-        if ! gcloud secrets delete "${SECRET}" --project="${PROJECT_ID}" --quiet; then
-            log_warn "Secret ${SECRET} could not be deleted."
+if [[ "${DELETE_SECRETS}" == "true" ]]; then
+    log_info "Step 4: Deleting secrets..."
+    SECRETS=(
+        "duckdns_token"
+        "email_address"
+        "domain_name"
+        "gcs_bucket_name"
+        "tf_state_bucket"
+        "backup_dir"
+        "billing_account_id"
+    )
+    for SECRET in "${SECRETS[@]}"; do
+        if gcloud secrets describe "${SECRET}" --project="${PROJECT_ID}" &>/dev/null; then
+            if ! gcloud secrets delete "${SECRET}" --project="${PROJECT_ID}" --quiet; then
+                log_warn "Secret ${SECRET} could not be deleted."
+            else
+                log_success "Deleted secret: ${SECRET}"
+            fi
         else
-            log_success "Deleted secret: ${SECRET}"
+            log_info "Secret ${SECRET} not found."
         fi
-    else
-        log_info "Secret ${SECRET} not found."
-    fi
-done
+    done
+fi
 
 # 5. Delete Artifact Registry Repository (from 5-create-artifact-registry.sh)
-log_info "Step 5: Deleting Artifact Registry: ${REPO_NAME}..."
-if gcloud artifacts repositories describe "${REPO_NAME}" --location="${REPO_LOCATION}" --project="${PROJECT_ID}" &>/dev/null; then
-    if ! gcloud artifacts repositories delete "${REPO_NAME}" \
-        --location="${REPO_LOCATION}" \
-        --project="${PROJECT_ID}" \
-        --quiet; then
-        log_warn "Artifact Registry repository ${REPO_NAME} could not be deleted."
+if [[ "${DELETE_ARTIFACT_REGISTRY}" == "true" ]]; then
+    log_info "Step 5: Deleting Artifact Registry: ${REPO_NAME}..."
+    if gcloud artifacts repositories describe "${REPO_NAME}" --location="${REPO_LOCATION}" --project="${PROJECT_ID}" &>/dev/null; then
+        if ! gcloud artifacts repositories delete "${REPO_NAME}" \
+            --location="${REPO_LOCATION}" \
+            --project="${PROJECT_ID}" \
+            --quiet; then
+            log_warn "Artifact Registry repository ${REPO_NAME} could not be deleted."
+        else
+            log_success "Deleted repository: ${REPO_NAME}"
+        fi
     else
-        log_success "Deleted repository: ${REPO_NAME}"
+        log_info "Repository ${REPO_NAME} not found."
     fi
-else
-    log_info "Repository ${REPO_NAME} not found."
 fi
 
 echo "------------------------------------------------------------"
