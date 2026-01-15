@@ -51,7 +51,7 @@ fi
 echo ""
 printf '=%.0s' {1..60}; echo
 log "Starting Host setup..."
-log "⏱️  Estimated time: 1-2 minutes"
+log "⏱️  Estimated time: 5-10 minutes"
 printf '=%.0s' {1..60}; echo
 echo ""
 
@@ -83,7 +83,7 @@ else
 fi
 
 echo ""
-log "📊 Summary: $CREATE_COUNT tasks to run, $SKIP_COUNT tasks to skip"
+log "📊 Summary: $((CREATE_COUNT + 3)) tasks to run, $SKIP_COUNT tasks to skip"
 echo ""
 
 if [ -t 0 ]; then
@@ -103,8 +103,18 @@ log "🚀 Starting setup execution..."
 printf '=%.0s' {1..60}; echo
 
 # Execute setup scripts in order
-log "Step 1/1: Configuring Swap..."
+log "Step 1/4: Configuring Swap..."
 "${SCRIPT_DIR}/host-01-create-swap.sh"
+
+"${SCRIPT_DIR}/host-02-setup-duckdns.sh"
+log "Step 2/4: Setting up DuckDNS..."
+"${SCRIPT_DIR}/host-02-setup-duckdns.sh"
+
+log "Step 3/4: Configuring Firewall..."
+"${SCRIPT_DIR}/host-03-firewall-config.sh"
+
+log "Step 4/4: Installing Nginx..."
+"${SCRIPT_DIR}/host-04-install-nginx.sh"
 
 echo ""
 printf '=%.0s' {1..60}; echo
