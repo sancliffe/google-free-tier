@@ -218,8 +218,13 @@ server {
         add_header Content-Type text/plain;
         return 200 'Login page placeholder. Rate limited to 5 requests per minute.';
     }
+}
 
-    # Internal metrics for Google Cloud Ops Agent
+# Separate server block for local metrics to avoid Certbot interference
+server {
+    listen 127.0.0.1:80;
+    server_name 127.0.0.1 localhost;
+
     location /stub_status {
         stub_status on;
         access_log off;
