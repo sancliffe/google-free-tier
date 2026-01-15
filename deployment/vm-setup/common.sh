@@ -19,12 +19,8 @@ _log() {
     timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     local prefix="${timestamp} ${color}[${level}]${NC}"
 
-    # Console Output - Errors go to stderr, everything else to stdout
-    if [[ "${level}" == "ERROR" ]]; then
-        echo -e "${prefix} ${message}" >&2
-    else
-        echo -e "${prefix} ${message}"
-    fi
+    # All logs to stderr to prevent polluting stdout for functions that return values.
+    echo -e "${prefix} ${message}" >&2
 
     # File Output (if LOG_FILE is set)
     if [[ -n "${LOG_FILE:-}" ]]; then
