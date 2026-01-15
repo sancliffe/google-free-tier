@@ -142,7 +142,6 @@ fetch_secret() {
         # Source config.sh with its stdout redirected to /dev/null to prevent
         # any 'echo' statements within config.sh from polluting the output.
         # Then, explicitly echo the value of the requested environment variable.
-        log_debug "Attempting to source config.sh for env_var_name: ${env_var_name}"
         if [[ -n "$env_var_name" ]]; then
             secret_value=$( (source "$script_dir/config.sh" >/dev/null 2>&1; echo "${!env_var_name}") )
             if [[ -n "$secret_value" ]]; then

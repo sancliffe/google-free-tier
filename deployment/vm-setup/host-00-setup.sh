@@ -48,6 +48,13 @@ ensure_root
 
 # --- Main ---
 
+# --- Diagnostic Check ---
+if [[ "${DEBUG:-false}" != "true" ]]; then
+    log_error "DIAGNOSTIC: DEBUG environment variable was not set to 'true'. This indicates the orchestrator script (gcp-00-setup.sh) may be stale or is not exporting it correctly. Aborting."
+    exit 1
+fi
+# --- End Diagnostic Check ---
+
 # Default flags for skipping steps
 SKIP_SWAP=false
 SKIP_DUCKDNS=false
